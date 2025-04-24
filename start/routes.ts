@@ -9,6 +9,7 @@
 
 import router from '@adonisjs/core/services/router'
 const EmailController = () => import('#controllers/send_email')
+const CodeTemporaireController = () => import('#controllers/codes_temporaire_controller')
 const AuthController = () => import('#controllers/auth_controller')
 const UtilisateursController = () => import('#controllers/utilisateurs_controller')
 const ClientController = () => import('#controllers/clients_controller')
@@ -28,6 +29,14 @@ router.get('/', async () => {
 })
 
 router.post('send-email', [EmailController, 'sendEmail'])
+
+router
+  .group(() => {
+    router.post('generate-code', [CodeTemporaireController, 'generate_code'])
+    router.post('check-code', [CodeTemporaireController, 'check_code'])
+    router.post('reset-code', [CodeTemporaireController, 'reset_code'])
+  })
+  .prefix('codes-temporaire')
 
 router
   .group(() => {
