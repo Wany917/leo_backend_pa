@@ -1,20 +1,18 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import Annonce from '#models/annonce'
+import Livraison from '#models/livraison'
 
 export default class Colis extends BaseModel {
   @column({ isPrimary: true })
-  declare tracking_number: string
+  declare id: number
+
+  @column({ columnName: 'annonce_id' })
+  declare annonceId: number
 
   @column()
-  declare annonce_id: number
-
-  @column()
-  declare livraison_id: number | null
-
-  @belongsTo(() => Livraison, {
-    foreignKey: 'livraison_id',
-  })
-  public livraison: BelongsTo<typeof Livraison>
+  declare trackingNumber: string
 
   @column()
   declare weight: number
@@ -29,14 +27,23 @@ export default class Colis extends BaseModel {
   declare height: number
 
   @column()
-  declare content_description: string
-
-  @column()
-  declare status: string
+  declare status: 'ready' | 'picked' | 'in_transit' | 'delivered'
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @belongsTo(() => Annonce, {
+    foreignKey: 'annonce_id',
+  })
+  declare annonce: BelongsTo<typeof Annonce>
+
+  @manyToMany(() => Livraison, {
+    pivotTable: 'livraison_colis',
+    pivotForeignKey: 'colis_id',
+    pivotRelatedForeignKey: 'livraison_id',
+  })
+  declare livraisons: ManyToMany<typeof Livraison>
 }

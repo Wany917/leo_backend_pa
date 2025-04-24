@@ -8,6 +8,7 @@
 */
 
 import router from '@adonisjs/core/services/router'
+const EmailController = () => import('#controllers/send_email')
 const AuthController = () => import('#controllers/auth_controller')
 const UtilisateursController = () => import('#controllers/utilisateurs_controller')
 const ClientController = () => import('#controllers/clients_controller')
@@ -25,6 +26,8 @@ router.get('/', async () => {
     version: '0.1 Beta',
   }
 })
+
+router.post('send-email', [EmailController, 'sendEmail'])
 
 router
   .group(() => {

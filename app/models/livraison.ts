@@ -1,38 +1,46 @@
 import { DateTime } from 'luxon'
+import { BaseModel, column, belongsTo, manyToMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
 import Colis from '#models/colis'
-import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import Livreur from '#models/livreur'
 
 export default class Livraison extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column({ columnName: 'livreur_id' })
-  declare livreur_id: number | null
+  declare livreurId: number | null
+
+  @column.dateTime()
+  declare scheduledDate: DateTime | null
+
+  @column.dateTime()
+  declare actualDeliveryDate: DateTime | null
 
   @column()
-  declare scheduled_date: DateTime
+  declare pickupLocation: string
 
   @column()
-  declare actual_delivery_date: DateTime | null
+  declare dropoffLocation: string
 
   @column()
-  declare pickup_location: string
+  declare status: 'pending' | 'in_transit' | 'delivered' | 'cancelled'
 
-  @column()
-  declare dropoff_location: string
+  @belongsTo(() => Livreur, {
+    foreignKey: 'livreur_id',
+  })
+  declare livreur: BelongsTo<typeof Livreur>
 
-  @column()
-  declare status: string
+  @manyToMany(() => Colis, {
+    pivotTable: 'livraison_colis',
+    pivotForeignKey: 'livraison_id',
+    pivotRelatedForeignKey: 'colis_id',
+  })
+  declare colis: ManyToMany<typeof Colis>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-
-  @hasMany(() => Colis, {
-    foreignKey: 'livraison_id',
-  })
-  public declare colis: HasMany<typeof Colis>
 }

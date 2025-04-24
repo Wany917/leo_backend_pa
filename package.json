@@ -60,7 +60,8 @@
     "adonis-swagger": "^1.2.9",
     "luxon": "^3.5.0",
     "pg": "^8.14.1",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "resend": "^4.4.0"
   },
   "hotHook": {
     "boundaries": [
