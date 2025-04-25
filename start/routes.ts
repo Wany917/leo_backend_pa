@@ -18,6 +18,7 @@ const PrestataireController = () => import('#controllers/prestataires_controller
 const CommercantController = () => import('#controllers/commercants_controller')
 const AnnonceController = () => import('#controllers/annonces_controller')
 const ColisController = () => import('#controllers/colis_controller')
+const LivraisonController = () => import('#controllers/livraisons_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -87,15 +88,23 @@ router
 
 router
   .group(() => {
-    router.post('create', [AnnonceController, 'create'])
+    router.post('create', [AnnonceController, 'create']).use(middleware.auth())
+    router.post(':id/livraisons', [LivraisonController, 'create']).use(middleware.auth())
     router.get(':id', [AnnonceController, 'getAnnonce'])
-    router.put(':id', [AnnonceController, 'updateAnnonce'])
+    router.put(':id', [AnnonceController, 'updateAnnonce']).use(middleware.auth())
   })
   .prefix('annonces')
 
 router
   .group(() => {
-    router.post('create', [ColisController, 'create'])
+    router.post('create', [ColisController, 'create']).use(middleware.auth())
     router.get(':tracking_number', [ColisController, 'getColis'])
   })
   .prefix('colis')
+
+router
+  .group(() => {
+    router.get(':id', [LivraisonController, 'show'])
+    router.put(':id', [LivraisonController, 'update']).use(middleware.auth())
+  })
+  .prefix('livraisons')

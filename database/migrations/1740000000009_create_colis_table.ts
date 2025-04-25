@@ -1,9 +1,9 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
 
-export default class extends BaseSchema {
+export default class CreateColisTable extends BaseSchema {
   protected tableName = 'colis'
 
-  public async up () {
+  public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
       table.integer('annonce_id').unsigned().notNullable()
@@ -12,8 +12,9 @@ export default class extends BaseSchema {
       table.decimal('length', 8, 2).notNullable()
       table.decimal('width', 8, 2).notNullable()
       table.decimal('height', 8, 2).notNullable()
+      table.string('content_description').nullable()
       table.enum('status', ['stored', 'in_transit', 'delivered', 'lost']).defaultTo('stored')
-      
+
       table.timestamp('created_at')
       table.timestamp('updated_at')
 
@@ -25,7 +26,7 @@ export default class extends BaseSchema {
     })
   }
 
-  async down() {
+  public async down() {
     this.schema.dropTable(this.tableName)
   }
 }

@@ -27,7 +27,10 @@ export default class Colis extends BaseModel {
   declare height: number
 
   @column()
-  declare status: 'ready' | 'picked' | 'in_transit' | 'delivered'
+  declare contentDescription: string
+
+  @column()
+  declare status: 'stored' | 'in_transit' | 'delivered' | 'lost'
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

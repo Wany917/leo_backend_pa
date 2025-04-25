@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Livraison from '#models/livraison'
 
 export default class HistoriqueLivraison extends BaseModel {
   @column({ isPrimary: true })
@@ -16,4 +18,7 @@ export default class HistoriqueLivraison extends BaseModel {
 
   @column()
   declare remarks: string | null
+
+  @belongsTo(() => Livraison, { foreignKey: 'livraison_id' })
+  declare livraison: BelongsTo<typeof Livraison>
 }

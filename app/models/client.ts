@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Utilisateurs from '#models/utilisateurs'
 
 
 export default class Client extends BaseModel {
@@ -11,6 +13,9 @@ export default class Client extends BaseModel {
 
   @column()
   declare preferred_payment_method: string | null
+
+  @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
+  declare user: BelongsTo<typeof Utilisateurs>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

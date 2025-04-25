@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import StockageColi from '#models/stockage_coli'
 
 export default class Wharehouse extends BaseModel {
   @column({ isPrimary: true })
@@ -10,6 +12,9 @@ export default class Wharehouse extends BaseModel {
 
   @column()
   declare capacity: number
+
+  @hasMany(() => StockageColi, { foreignKey: 'wharehouse_id' })
+  declare stockage: HasMany<typeof StockageColi>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

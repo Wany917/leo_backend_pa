@@ -7,6 +7,6 @@ export const livraisonValidator = vine.compile(
         actual_delivery_date: vine.date().optional(),
         pickup_location: vine.string().minLength(3).maxLength(100),
         dropoff_location: vine.string().minLength(3).maxLength(100),
-        status: vine.enum(['pending', 'in_progress', 'delivered', 'canceled']).optional(),
+        status: vine.enum(['scheduled','in_progress','completed','cancelled']).optional(),
     })
 )

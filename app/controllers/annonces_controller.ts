@@ -1,41 +1,43 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Annonce from '#models/annonce'
 import { annonceValidator } from '#validators/create_annonce'
+import { updateAnnonceValidator } from '#validators/update_annonce'
 
 export default class AnnoncesController {
     async create({ request, response }: HttpContext) {
-        try {
-            const { user_id, title, description, tags, state } = await request.validateUsing(annonceValidator)
-            const annonce = await Annonce.create({
-                user_id: user_id,
-                title: title,
-                description: description,
-                tags: tags,
-                state: state
-            })
-            return response.created({ message: 'Annonce created successfully', annonce: annonce.serialize() })
-        } catch (error) {
-            return response.badRequest({ message: 'Invalid data', error_code: error })
-        }
+        const { user_id, title, description, state } = await request.validateUsing(annonceValidator)
+        const annonce = await Annonce.create({
+            utilisateurId: user_id,
+            title,
+            description: description ?? null,
+            state: state ?? 'open',
+        })
+        await annonce.load('utilisateur')
+        return response.created({ annonce: annonce.serialize() })
     }
-
-    async getAnnonce({ request, response }: HttpContext) {
-        try {
-            const annonces = await Annonce.findOrFail(request.param('id'))
-            return response.ok({ annonce: annonces })
-        } catch (error) {
-            return response.notFound({ message: 'Annonce not found', error_code: error })
-        }
+    
+    async show({ request, response }: HttpContext) {
+        const annonce = await Annonce.query()
+            .where('id', request.param('id'))
+            .preload('utilisateur')
+            .preload('colis')
+            .preload('services')
+            .firstOrFail()
+    
+        return response.ok({ annonce: annonce.serialize() })
     }
-
-    async updateAnnonce({ request, response }: HttpContext) {
-        try {
-            const annonce = await Annonce.findOrFail(request.param('id'))
-            annonce.merge(request.body())
-            await annonce.save()
-            return response.ok(annonce)
-        } catch (error) {
-            return response.badRequest({ message: 'Wrong Parametters', error_code: error })
-        }
+    
+    async update({ request, response }: HttpContext) {
+        const payload = await request.validateUsing(updateAnnonceValidator)
+        const annonce = await Annonce.findOrFail(request.param('id'))
+        annonce.merge({
+            title:       payload.title       ?? annonce.title,
+            description: payload.description ?? annonce.description,
+            state:       payload.state       ?? annonce.state,
+        })
+        await annonce.save()
+        await annonce.load('colis')
+        await annonce.load('services')
+        return response.ok({ annonce: annonce.serialize() })
     }
 }
