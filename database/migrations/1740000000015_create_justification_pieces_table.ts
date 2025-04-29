@@ -7,7 +7,7 @@ export default class extends BaseSchema {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
 
-      table.integer('user_id').unsigned()
+      table.integer('utilisateur_id').unsigned()
       table.string('document_type', 255).notNullable()
       table.string('file_path', 255).notNullable()
       table
@@ -17,7 +17,7 @@ export default class extends BaseSchema {
       table.timestamp('uploaded_at')
       table.timestamp('verified_at').nullable()
 
-      table.foreign('user_id').references('id').inTable('utilisateurs').onDelete('CASCADE')
+      table.foreign('utilisateur_id').references('id').inTable('utilisateurs').onDelete('CASCADE')
     })
   }
 

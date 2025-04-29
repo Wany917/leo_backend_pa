@@ -88,16 +88,17 @@ router
 
 router
   .group(() => {
-    router.post('create', [AnnonceController, 'create']).use(middleware.auth())
-    router.post(':id/livraisons', [LivraisonController, 'create']).use(middleware.auth())
+    router.post('create', [AnnonceController, 'create'])
+    router.post(':id/livraisons', [LivraisonController, 'create'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
-    router.put(':id', [AnnonceController, 'updateAnnonce']).use(middleware.auth())
+    router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
+    router.put(':id', [AnnonceController, 'updateAnnonce'])
   })
   .prefix('annonces')
 
 router
   .group(() => {
-    router.post('create', [ColisController, 'create']).use(middleware.auth())
+    router.post('create', [ColisController, 'create'])
     router.get(':tracking_number', [ColisController, 'getColis'])
   })
   .prefix('colis')
@@ -105,6 +106,6 @@ router
 router
   .group(() => {
     router.get(':id', [LivraisonController, 'show'])
-    router.put(':id', [LivraisonController, 'update']).use(middleware.auth())
+    router.put(':id', [LivraisonController, 'update'])
   })
   .prefix('livraisons')

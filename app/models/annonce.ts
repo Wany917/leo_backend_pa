@@ -16,7 +16,10 @@ export default class Annonce extends BaseModel {
   declare title: string
 
   @column()
-  declare description: string
+  declare description: string | null
+
+  @column()
+  declare tags: string[]
 
   @column()
   declare state: 'open' | 'pending' | 'closed'
@@ -28,12 +31,12 @@ export default class Annonce extends BaseModel {
   declare updatedAt: DateTime
 
   @belongsTo(() => Utilisateurs, {
-    foreignKey: 'utilisateur_id',
+    foreignKey: 'utilisateurId',
   })
   declare utilisateur: BelongsTo<typeof Utilisateurs>
 
   @hasMany(() => Colis, {
-    foreignKey: 'annonce_id',
+    foreignKey: 'annonceId',
   })
   declare colis: HasMany<typeof Colis>
 

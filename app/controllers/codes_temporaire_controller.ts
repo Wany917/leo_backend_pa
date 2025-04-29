@@ -5,16 +5,22 @@ import { checkCodeValidator } from '#validators/check_code'
 
 export default class CodeTemporairesController {
     async generate_code({ request, response }: HttpContext) {
+        const { user_info } = await request.validateUsing(generateCodeValidator)
+        const userExists = await CodeTemporaire.query()
+            .where('user_info', user_info)
+            .first()
+
+        if (userExists) {
+            return response.badRequest({ error_message: 'Code already exists for this user' })
+        }
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString()
+
         try {
-            const { user_info } = await request.validateUsing(generateCodeValidator)
-            const code = Math.floor(100000 + Math.random() * 900000).toString()
-            await CodeTemporaire.create({
-                user_info,
-                code,
-            })
-            return response.ok({ message: 'Code created successfully', returned_code: code })
+            await CodeTemporaire.create({ user_info, code })
+            return response.ok({ message: 'Code created successfully', code: code })
         } catch (error) {
-            return response.badRequest({ error_message: 'Failed to create code', error: error })
+            return response.badRequest({ error_message: 'Failed to create code', error })
         }
     }
 
@@ -22,13 +28,13 @@ export default class CodeTemporairesController {
         try {
             const { user_info, code } = await request.validateUsing(checkCodeValidator)
             const codeTemporaire = await CodeTemporaire.query()
-                .where('user_info', JSON.stringify(user_info))
+                .where('user_info', user_info)
                 .where('code', code)
                 .first()
 
             if (codeTemporaire) {
                 await CodeTemporaire.query()
-                    .where('user_info', JSON.stringify(user_info))
+                    .where('user_info', user_info)
                     .where('code', code)
                     .delete()
                 return response.ok({ message: 'Code is valid' })
@@ -44,14 +50,15 @@ export default class CodeTemporairesController {
         try {
             const { user_info } = await request.validateUsing(generateCodeValidator)
             const codeTemporaire = await CodeTemporaire.query()
-                .where('user_info', JSON.stringify(user_info))
+                .where('user_info', user_info)
                 .first()
 
-            if (codeTemporaire) {
+            if (codeTemporaire) {                    
+                const code = Math.floor(100000 + Math.random() * 900000).toString()
                 await CodeTemporaire.query()
-                    .where('user_info', JSON.stringify(user_info))
-                    .delete()
-                return response.ok({ message: 'Code reset successfully' })
+                    .where('user_info', user_info)
+                    .update({ code: code })
+                return response.ok({ message: 'Code reset successfully', code: code })
             } else {
                 return response.badRequest({ error_message: 'No code found for this user' })
             }

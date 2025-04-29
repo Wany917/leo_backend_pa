@@ -8,7 +8,7 @@ export default class CommercantsController {
   async add({ request, response }: HttpContext) {
     try {
       const {
-        user_id,
+        utilisateur_id,
         store_name,
         business_address,
         contact_number,
@@ -16,13 +16,13 @@ export default class CommercantsController {
         contract_end_date,
       } = await request.validateUsing(commercantValidator)
 
-      const commercantAlreadyLinked = await Commercant.findBy('id', user_id)
+      const commercantAlreadyLinked = await Commercant.findBy('id', utilisateur_id)
       if (commercantAlreadyLinked) {
         return response.badRequest({ message: 'Utilisateurs already has a Commercant account' })
       }
 
       const commercant = await Commercant.create({
-        id: user_id,
+        id: utilisateur_id,
         store_name: store_name,
         business_address: business_address,
         contact_number: contact_number || null,

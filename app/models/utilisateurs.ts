@@ -63,7 +63,7 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
   @hasOne(() => Prestataire, { foreignKey: 'id' })
   declare prestataire: HasOne<typeof Prestataire>
 
-  @hasMany(() => JustificationPiece, { foreignKey: 'user_id' })
+  @hasMany(() => JustificationPiece, { foreignKey: 'utilisateur_id' })
   declare justificationPieces: HasMany<typeof JustificationPiece>
 
   static accessTokens = DbAccessTokensProvider.forModel(Utilisateurs)

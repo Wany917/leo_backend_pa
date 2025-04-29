@@ -6,15 +6,15 @@ import { prestataireValidator } from '#validators/add_prestataire'
 export default class PrestatairesController {
   async add({ request, response }: HttpContext) {
     try {
-      const { user_id, service_type } = await request.validateUsing(prestataireValidator)
+      const { utilisateur_id, service_type } = await request.validateUsing(prestataireValidator)
 
-      const prestataireAlreadyLinked = await Prestataire.findBy('id', user_id)
+      const prestataireAlreadyLinked = await Prestataire.findBy('id', utilisateur_id)
       if (prestataireAlreadyLinked) {
         return response.badRequest({ message: 'Utilisateurs already has a Prestataire account' })
       }
 
       const prestataire = await Prestataire.create({
-        id: user_id,
+        id: utilisateur_id,
         service_type: service_type || null,
         rating: null,
       })

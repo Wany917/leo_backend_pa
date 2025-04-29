@@ -15,6 +15,7 @@ export default class extends BaseSchema {
 
       table.string('title').notNullable()
       table.text('description').nullable()
+      table.specificType('tags', 'text[]').nullable()
       table.enum('state', ['open', 'pending', 'closed']).defaultTo('open')
 
       table.timestamp('created_at')

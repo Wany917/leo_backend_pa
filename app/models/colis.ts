@@ -39,7 +39,7 @@ export default class Colis extends BaseModel {
   declare updatedAt: DateTime
 
   @belongsTo(() => Annonce, {
-    foreignKey: 'annonce_id',
+    foreignKey: 'annonceId',
   })
   declare annonce: BelongsTo<typeof Annonce>
 

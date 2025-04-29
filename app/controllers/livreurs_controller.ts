@@ -6,15 +6,15 @@ import { livreurValidator } from '#validators/add_livreur'
 export default class LivreursController {
   async add({ request, response }: HttpContext) {
     try {
-      const { user_id } = await request.validateUsing(livreurValidator)
+      const { utilisateur_id } = await request.validateUsing(livreurValidator)
 
-      const livreurAlreadyLinked = await Livreur.findBy('id', user_id)
+      const livreurAlreadyLinked = await Livreur.findBy('id', utilisateur_id)
       if (livreurAlreadyLinked) {
         return response.badRequest({ message: 'Utilisateurs already has a Livreur account' })
       }
 
       const livreur = await Livreur.create({
-        id: user_id,
+        id: utilisateur_id,
         availability_status: 'available',
         rating: null,
       })

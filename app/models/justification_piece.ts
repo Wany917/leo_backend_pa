@@ -6,7 +6,7 @@ export default class JustificationPiece extends BaseModel {
   declare id: number
 
   @column()
-  declare user_id: number
+  declare utilisateur_id: number
 
   @column()
   declare document_type: string

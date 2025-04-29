@@ -6,15 +6,15 @@ import { clientValidator } from '#validators/add_client'
 export default class ClientController {
   async add({ request, response }: HttpContext) {
     try {
-      const { user_id } = await request.validateUsing(clientValidator)
+      const { utilisateur_id } = await request.validateUsing(clientValidator)
 
-      const clientAlreadyLinked = await Client.findBy('id', user_id)
+      const clientAlreadyLinked = await Client.findBy('id', utilisateur_id)
       if (clientAlreadyLinked) {
         return response.badRequest({ message: 'Utilisateurs already has a Client account' })
       }
 
       const client = await Client.create({
-        id: user_id,
+        id: utilisateur_id,
         loyalty_points: 0,
         preferred_payment_method: null,
       })
