@@ -15,14 +15,15 @@ export default class CreateColisTable extends BaseSchema {
       table.string('content_description').nullable()
       table.enum('status', ['stored', 'in_transit', 'delivered', 'lost']).defaultTo('stored')
 
+      // Champs de localisation ajoutés
+      table.string('location_type').nullable()
+      table.integer('location_id').nullable()
+      table.string('current_address').nullable()
+
       table.timestamp('created_at')
       table.timestamp('updated_at')
 
-      table
-        .foreign('annonce_id')
-        .references('id')
-        .inTable('annonces')
-        .onDelete('CASCADE')
+      table.foreign('annonce_id').references('id').inTable('annonces').onDelete('CASCADE')
     })
   }
 

@@ -13,12 +13,6 @@ export default class LivraisonsController {
         const payload = await request.validateUsing(livraisonValidator)
         const livraison = await Livraison.create({
             livreurId: payload.livreur_id ?? null,
-            scheduledDate: payload.scheduled_date 
-                ? DateTime.fromJSDate(payload.scheduled_date) 
-                : null,
-            actualDeliveryDate: payload.actual_delivery_date
-                ? DateTime.fromJSDate(payload.actual_delivery_date)
-                : null,
             pickupLocation: payload.pickup_location,
             dropoffLocation: payload.dropoff_location,
             status: payload.status ?? 'scheduled',
@@ -48,12 +42,6 @@ export default class LivraisonsController {
 
         livraison.merge({
             livreurId: payload.livreur_id ?? livraison.livreurId,
-            scheduledDate: payload.scheduled_date
-                ? DateTime.fromJSDate(payload.scheduled_date)
-                : livraison.scheduledDate,
-            actualDeliveryDate: payload.actual_delivery_date
-                ? DateTime.fromJSDate(payload.actual_delivery_date)
-                : livraison.actualDeliveryDate,
             pickupLocation: payload.pickup_location ?? livraison.pickupLocation,
             dropoffLocation: payload.dropoff_location ?? livraison.dropoffLocation,
             status: payload.status ?? livraison.status,

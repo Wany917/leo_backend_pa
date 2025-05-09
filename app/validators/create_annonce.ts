@@ -5,6 +5,9 @@ export const annonceValidator = vine.compile(
     utilisateur_id: vine.number(),
     title: vine.string().minLength(3).maxLength(50),
     description: vine.string().minLength(10).maxLength(500).optional(),
+    price: vine.number(),
     tags: vine.array(vine.string()).optional(),
+    scheduled_date: vine.date().optional(),
+    actual_delivery_date: vine.date().optional(),
   })
 )

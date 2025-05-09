@@ -3,7 +3,7 @@ import { BaseSchema } from '@adonisjs/lucid/schema'
 export default class extends BaseSchema {
   protected tableName = 'annonces'
 
-  public async up () {
+  public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
       table
@@ -15,15 +15,18 @@ export default class extends BaseSchema {
 
       table.string('title').notNullable()
       table.text('description').nullable()
+      table.decimal('price', 10, 2).notNullable()
       table.specificType('tags', 'text[]').nullable()
       table.enum('state', ['open', 'pending', 'closed']).defaultTo('open')
+      table.dateTime('scheduled_date').nullable()
+      table.dateTime('actual_delivery_date').nullable()
 
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })
   }
 
-  public async down () {
+  public async down() {
     this.schema.dropTable(this.tableName)
   }
 }
