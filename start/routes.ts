@@ -22,6 +22,10 @@ const LivraisonController = () => import('#controllers/livraisons_controller')
 const MessageController = () => import('#controllers/messages_controller')
 const StorageBoxController = () => import('#controllers/storage_box_controller')
 const WharehousesController = () => import('#controllers/wharehouses_controller')
+const ComplaintsController = () => import('#controllers/complaints_controller')
+const AdminController = () => import('#controllers/admin_controller')
+const ServicesController = () => import('#controllers/services_controller')
+const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 
 import { middleware } from '#start/kernel'
@@ -105,6 +109,10 @@ router
     router.get(':id', [AnnonceController, 'getAnnonce'])
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
     router.put(':id', [AnnonceController, 'updateAnnonce'])
+    router.put(':id/with-string-dates', [AnnonceController, 'updateAnnonceWithStringDates'])
+    router.post(':id/services', [AnnonceServicesController, 'attachServices'])
+    router.delete(':id/services', [AnnonceServicesController, 'detachServices'])
+    router.get(':id/services', [AnnonceServicesController, 'getServices'])
   })
   .prefix('annonces')
 
@@ -117,14 +125,13 @@ router
   })
   .prefix('colis')
 
+// Groupe de routes administratives pour les colis
 router
   .group(() => {
-    router.post('create', [StorageBoxController, 'create'])
-    router.get(':id', [StorageBoxController, 'getStorageBox'])
-    router.put(':id', [StorageBoxController, 'update'])
-    router.delete(':id', [StorageBoxController, 'delete'])
+    router.get('/', [ColisController, 'getAllColis'])
   })
-  .prefix('storage-boxes')
+  .prefix('admin/colis')
+  .use([middleware.auth(), middleware.admin()])
 
 router
   .group(() => {
@@ -149,6 +156,37 @@ router
     router.put(':id/read', [MessageController, 'markRead']).use(middleware.auth())
   })
   .prefix('messages')
+
+router
+  .group(() => {
+    router.get('/', [ComplaintsController, 'index'])
+    router.post('/', [ComplaintsController, 'create'])
+    router.get(':id', [ComplaintsController, 'show'])
+    router.put(':id', [ComplaintsController, 'update'])
+    router.delete(':id', [ComplaintsController, 'delete'])
+    router.get('user/:utilisateur_id', [ComplaintsController, 'getUserComplaints'])
+  })
+  .prefix('complaints')
+
+router
+  .group(() => {
+    router.get('/', [AdminController, 'index']).use([middleware.auth(), middleware.admin()])
+    router.post('/', [AdminController, 'create']).use([middleware.auth(), middleware.admin()])
+    router.get(':id', [AdminController, 'get']).use([middleware.auth(), middleware.admin()])
+    router.put(':id', [AdminController, 'update']).use([middleware.auth(), middleware.admin()])
+    router.delete(':id', [AdminController, 'delete']).use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('admins')
+
+router
+  .group(() => {
+    router.get('/', [ServicesController, 'index'])
+    router.post('/', [ServicesController, 'create'])
+    router.get(':id', [ServicesController, 'show'])
+    router.put(':id', [ServicesController, 'update'])
+    router.delete(':id', [ServicesController, 'delete'])
+  })
+  .prefix('services')
 
 router
   .group(() => {

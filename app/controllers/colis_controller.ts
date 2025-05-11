@@ -7,6 +7,46 @@ import { colisValidator } from '#validators/create_coli'
 import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ColisController {
+  // Méthode pour récupérer tous les colis (pour les administrateurs)
+  async getAllColis({ request, response }: HttpContext) {
+    try {
+      const page = request.input('page', 1)
+      const limit = request.input('limit', 20)
+      const status = request.input('status')
+      const search = request.input('search')
+
+      let query = Colis.query().preload('annonce', (annonceQuery) => {
+        annonceQuery.preload('utilisateur')
+      })
+
+      // Filtrage par statut si fourni
+      if (status) {
+        query = query.where('status', status)
+      }
+
+      // Recherche par numéro de suivi ou description
+      if (search) {
+        query = query.where((builder) => {
+          builder
+            .where('tracking_number', 'LIKE', `%${search}%`)
+            .orWhere('content_description', 'LIKE', `%${search}%`)
+        })
+      }
+
+      const colis = await query.orderBy('created_at', 'desc').paginate(page, limit)
+
+      return response.ok({
+        colis: colis.serialize(),
+      })
+    } catch (error) {
+      console.error('Error fetching all packages:', error)
+      return response.status(500).json({
+        error: 'Une erreur est survenue lors de la récupération des colis',
+        details: error.message,
+      })
+    }
+  }
+
   async create({ request, response }: HttpContext) {
     const {
       annonce_id,

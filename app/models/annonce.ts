@@ -39,6 +39,21 @@ export default class Annonce extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
+  @column()
+  declare destinationAddress: string | null
+
+  @column()
+  declare startingAddress: string | null
+
+  @column()
+  declare imagePath: string | null
+
+  @column()
+  declare priority: boolean
+
+  @column()
+  declare storageBoxId: string | null
+
   @belongsTo(() => Utilisateurs, {
     foreignKey: 'utilisateurId',
   })

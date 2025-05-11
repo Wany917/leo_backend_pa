@@ -9,14 +9,10 @@ export const annonceValidator = vine.compile(
     tags: vine.array(vine.string()).optional(),
     scheduled_date: vine.date().optional(),
     actual_delivery_date: vine.date().optional(),
-    colis: vine.array(
-      vine.object({
-        tracking_number: vine.string().minLength(10).maxLength(10),
-        weight: vine.number(),
-        length: vine.number(),
-        width: vine.number(),
-        height: vine.number(),
-      })
-    ),
+    destination_address: vine.string().optional(),
+    starting_address: vine.string().optional(),
+    priority: vine.boolean().optional(),
+    storage_box_id: vine.string().optional(),
+    image_path: vine.string().optional(),
   })
 )
