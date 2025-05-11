@@ -85,7 +85,28 @@ export default class AuthController {
   async me({ auth, response }: HttpContext) {
     try {
       const user = await auth.authenticate()
-      return response.ok(user)
+
+      // Récupérer l'utilisateur avec toutes ses relations
+      const fullUser = await Utilisateurs.query()
+        .where('id', user.id)
+        .preload('admin' as any)
+        .preload('client' as any)
+        .preload('livreur' as any)
+        .preload('prestataire' as any)
+        .firstOrFail()
+
+      // Déterminer le rôle principal de l'utilisateur
+      let role = 'user'
+      if (fullUser.admin) role = 'admin'
+      else if (fullUser.livreur) role = 'livreur'
+      else if (fullUser.client) role = 'client'
+      else if (fullUser.prestataire) role = 'prestataire'
+
+      // Ajouter le rôle à la réponse
+      const userData = fullUser.serialize()
+      userData.role = role
+
+      return response.ok(userData)
     } catch (error) {
       return response.status(401).send({ message: 'Unauthorized access' })
     }

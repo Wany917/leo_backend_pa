@@ -21,6 +21,13 @@ export default class extends BaseSchema {
       table.dateTime('scheduled_date').nullable()
       table.dateTime('actual_delivery_date').nullable()
 
+      // Colonnes ajoutées des autres migrations
+      table.string('destination_address').nullable()
+      table.string('starting_address').nullable()
+      table.string('image_path').nullable()
+      table.boolean('priority').defaultTo(false)
+      table.string('storage_box_id').nullable()
+
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })
