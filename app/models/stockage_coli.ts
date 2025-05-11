@@ -1,36 +1,38 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Colis from '#models/colis'
 import Wharehouse from '#models/wharehouse'
+import { belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column } from '@adonisjs/lucid/orm'
 
 export default class StockageColi extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  @column({ columnName: 'colis_id' })
-  declare colisId: number
+  @column()
+  declare colis_id: number
 
-  @column({ columnName: 'wharehouse_id' })
-  declare warehouseId: number
+  @column()
+  declare colis_tracking_number: string
+
+  @column()
+  declare wharehouse_id: number
 
   @column()
   declare storage_area: string
 
-  @column.dateTime()
+  @column()
   declare stored_until: DateTime
 
   @column()
   declare description: string
 
   @belongsTo(() => Colis, {
-    foreignKey: 'colisId',
+    foreignKey: 'colis_id',
   })
   declare colis: BelongsTo<typeof Colis>
 
-  @belongsTo(() => Wharehouse, {
-    foreignKey: 'warehouseId',
-  })
+  @belongsTo(() => Wharehouse, { foreignKey: 'wharehouse_id' })
   declare wharehouse: BelongsTo<typeof Wharehouse>
 
   @column.dateTime({ autoCreate: true })

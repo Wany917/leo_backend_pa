@@ -26,7 +26,7 @@ export default class Message extends BaseModel {
   declare updatedAt: DateTime
 
   @belongsTo(() => Utilisateurs, { foreignKey: 'senderId' })
-  declare sender: BelongsTo<typeof Utilisateurs>
+  declare sender:   BelongsTo<typeof Utilisateurs>
 
   @belongsTo(() => Utilisateurs, { foreignKey: 'receiverId' })
   declare receiver: BelongsTo<typeof Utilisateurs>

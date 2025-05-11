@@ -4,14 +4,21 @@ import { checkPasswordValidator } from '#validators/check_password'
 import Utilisateurs from '#models/utilisateurs'
 
 export default class UtilisateursController {
-  async getIndex({ request, response }: HttpContext) {
+  async getAll({ auth, response }: HttpContext) {
     try {
-      const users = await Utilisateurs.all()
-      console.log('Utilisateurs trouvés:', users.length, users)
-      return response.ok(users.map((user) => user.serialize()))
+      if(!auth.authenticate())  {
+        return response.unauthorized({ message: 'Unauthorized access' })
+      }
+      // get the list of all users except the current user
+      const currentUser = auth.user
+      if (!currentUser) {
+        return response.unauthorized({ message: 'Unauthorized access' })
+      }
+      const currentUserId = currentUser.id
+      const users = await Utilisateurs.query().where('id', '!=', currentUserId)
+      return response.ok({ users: users.map((user) => user.serialize()) })
     } catch (error) {
-      console.error('Erreur dans getIndex:', error)
-      return response.notFound({ message: 'Utilisateurs not found' })
+      return response.badRequest({ message: 'Error fetching users', error_code: error })
     }
   }
 
@@ -43,7 +50,7 @@ export default class UtilisateursController {
       await user.save()
       return response.ok({ message: 'Utilisateurs updated successfully', user: user.serialize() })
     } catch (error) {
-      if (error.status === 401) {
+      if (error.status == 401) {
         return response.unauthorized({ message: 'Unauthorized access', error_message: error })
       }
       return response.badRequest({ message: 'Wrong Parametters', error_code: error })

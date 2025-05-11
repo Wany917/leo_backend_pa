@@ -99,7 +99,8 @@ export default class AuthController {
         await token.delete()
       }
       return response.ok({ message: 'Token deleted successfully' })
-    } catch (error) {
+    }
+    catch (error) {
       return response.status(401).send({ message: 'Unauthorized access' })
     }
   }

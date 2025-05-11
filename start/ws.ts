@@ -1,7 +1,6 @@
 import app from '@adonisjs/core/services/app'
 import Ws from '#services/ws'
 import { userSockets } from '#controllers/messages_controller'
-import Message from '#models/message'
 
 // Fonction d'extraction d'ID valide
 const extractValidUserId = (userId: any): number | null => {
@@ -74,7 +73,7 @@ app.ready(() => {
     // Écouter les nouveaux messages
     socket.on('send_message', async (data) => {
       try {
-        const { receiverId, content, tempId } = data
+        const { receiverId, content } = data
         const validReceiverId = extractValidUserId(receiverId)
 
         if (!validReceiverId) {
@@ -83,66 +82,18 @@ app.ready(() => {
           return
         }
 
-        // Créer le message dans la base de données
-        try {
-          const message = await Message.create({
+        // Notifier le destinataire s'il est connecté
+        const receiverSocket = userSockets.get(validReceiverId)
+        if (receiverSocket) {
+          receiverSocket.emit('new_message', {
             senderId: socket.data.userId,
-            receiverId: validReceiverId,
             content,
-            isRead: false,
-          })
-
-          // Charger les relations
-          const messageWithRelations = await Message.query()
-            .where('id', message.id)
-            .preload('sender' as any)
-            .preload('receiver' as any)
-            .firstOrFail()
-
-          // Préparer un message formaté
-          const formattedMessage = {
-            id: messageWithRelations.id,
-            senderId: messageWithRelations.senderId,
-            receiverId: messageWithRelations.receiverId,
-            content: messageWithRelations.content,
-            isRead: messageWithRelations.isRead,
-            createdAt: messageWithRelations.createdAt.toISO(),
-            timestamp: messageWithRelations.createdAt.toISO(),
-            tempId: tempId, // Inclure l'ID temporaire
-            sender: messageWithRelations.sender
-              ? {
-                  id: messageWithRelations.sender.id,
-                  first_name: messageWithRelations.sender.first_name || 'Utilisateur',
-                  last_name: messageWithRelations.sender.last_name || '',
-                }
-              : null,
-            receiver: messageWithRelations.receiver
-              ? {
-                  id: messageWithRelations.receiver.id,
-                  first_name: messageWithRelations.receiver.first_name || 'Utilisateur',
-                  last_name: messageWithRelations.receiver.last_name || '',
-                }
-              : null,
-          }
-
-          // Notifier le destinataire s'il est connecté
-          const receiverSocket = userSockets.get(validReceiverId)
-          if (receiverSocket) {
-            console.log(`Émission WebSocket 'new_message' vers utilisateur ${validReceiverId}`)
-            receiverSocket.emit('new_message', formattedMessage)
-          }
-
-          // Confirmer à l'expéditeur que le message a été envoyé
-          socket.emit('message_sent', formattedMessage)
-
-          console.log(`Message from ${socket.data.userId} to ${validReceiverId} saved: ${content}`)
-        } catch (dbError) {
-          console.error('Error saving message to database:', dbError)
-          socket.emit('error', {
-            message: 'Failed to save message',
-            originalError: dbError.message,
+            timestamp: new Date().toISOString(),
           })
         }
+
+        // Vous pourriez vouloir persister le message dans la base de données ici
+        console.log(`Message from ${socket.data.userId} to ${validReceiverId}: ${content}`)
       } catch (error) {
         console.error('Error handling send_message:', error)
         socket.emit('error', { message: 'Failed to process message' })
