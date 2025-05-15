@@ -20,7 +20,6 @@ const AnnonceController = () => import('#controllers/annonces_controller')
 const ColisController = () => import('#controllers/colis_controller')
 const LivraisonController = () => import('#controllers/livraisons_controller')
 const MessageController = () => import('#controllers/messages_controller')
-const StorageBoxController = () => import('#controllers/storage_box_controller')
 const WharehousesController = () => import('#controllers/wharehouses_controller')
 const ComplaintsController = () => import('#controllers/complaints_controller')
 const AdminController = () => import('#controllers/admin_controller')
@@ -104,7 +103,6 @@ router
 router
   .group(() => {
     router.post('create', [AnnonceController, 'create'])
-    router.post('create-with-colis', [AnnonceController, 'createWithColis'])
     router.post(':id/livraisons', [LivraisonController, 'create'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
@@ -125,7 +123,6 @@ router
   })
   .prefix('colis')
 
-// Groupe de routes administratives pour les colis
 router
   .group(() => {
     router.get('/', [ColisController, 'getAllColis'])

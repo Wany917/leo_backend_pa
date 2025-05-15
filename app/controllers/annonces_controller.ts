@@ -1,7 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Annonce from '#models/annonce'
-import Colis from '#models/colis'
-import StockageColi from '#models/stockage_coli'
 import { annonceValidator } from '#validators/create_annonce'
 import { updateAnnonceValidator } from '#validators/update_annonce'
 import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
@@ -153,17 +151,13 @@ export default class AnnoncesController {
     return response.ok({ annonce: annonce.serialize() })
   }
 
-  // Méthode spéciale pour mettre à jour une annonce en acceptant des dates au format YYYY-MM-DD
   async updateAnnonceWithStringDates({ request, response }: HttpContext) {
     try {
       const annonce = await Annonce.findOrFail(request.param('id'))
 
-      // Récupérer les données du formulaire
       const formData = request.all()
 
-      // Traiter les dates spéciales
       if (formData.scheduled_date && typeof formData.scheduled_date === 'string') {
-        // Convertir YYYY-MM-DD en objet DateTime
         try {
           annonce.scheduledDate = DateTime.fromFormat(formData.scheduled_date, 'yyyy-MM-dd')
         } catch (e) {
@@ -182,7 +176,6 @@ export default class AnnoncesController {
         }
       }
 
-      // Mettre à jour les autres champs
       if (formData.title) annonce.title = formData.title
       if (formData.description) annonce.description = formData.description
       if (formData.price !== undefined) annonce.price = formData.price
@@ -190,12 +183,10 @@ export default class AnnoncesController {
       if (formData.destination_address) annonce.destinationAddress = formData.destination_address
       if (formData.starting_address) annonce.startingAddress = formData.starting_address
       if (formData.priority !== undefined) {
-        // Convertir la chaîne en booléen
         annonce.priority = formData.priority === 'true' || formData.priority === true
       }
       if (formData.storage_box_id) annonce.storageBoxId = formData.storage_box_id
 
-      // Gérer l'upload d'image si présent
       const image = request.file('image')
       if (image) {
         const fileName = `${Date.now()}_${image.clientName}`
