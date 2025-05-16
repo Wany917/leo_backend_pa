@@ -8,6 +8,7 @@
 */
 
 import router from '@adonisjs/core/services/router'
+const SwaggerController = () => import('../app/controllers/swagger_controller.js')
 const EmailController = () => import('#controllers/send_email')
 const CodeTemporaireController = () => import('#controllers/codes_temporaire_controller')
 const AuthController = () => import('#controllers/auth_controller')
@@ -28,6 +29,10 @@ const AnnonceServicesController = () => import('#controllers/annonce_services_co
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 
 import { middleware } from '#start/kernel'
+
+// Routes Swagger
+router.get('/swagger', [SwaggerController, 'getJSON'])
+router.get('/docs', [SwaggerController, 'getUI'])
 
 router.get('/', async () => {
   return {
@@ -102,6 +107,7 @@ router
 
 router
   .group(() => {
+    router.get('/', [AnnonceController, 'getAllAnnonces'])
     router.post('create', [AnnonceController, 'create'])
     router.post(':id/livraisons', [LivraisonController, 'create'])
     router.get(':id', [AnnonceController, 'getAnnonce'])

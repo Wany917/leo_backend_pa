@@ -50,37 +50,42 @@ export default class JustificationPiecesController {
         }
     }
 
-    async getUserPieces({ request, response }: HttpContext) {
-        try {
-            const userId = request.param('user_id')
-            const justificationPieces = await JustificationPiece.query().where('utilisateur_id', userId)
-            return response.ok({ justificationPieces: justificationPieces.map((piece) => piece.serialize()) })
-        } catch (error) {
-            return response.badRequest({ message: 'Error fetching user justification pieces', error: error })
-        }
+  async getUserPieces({ request, response }: HttpContext) {
+    try {
+      const userId = request.param('user_id')
+      const justificationPieces = await JustificationPiece.query().where('utilisateur_id', userId)
+      return response.ok({
+        justificationPieces: justificationPieces.map((piece) => piece.serialize()),
+      })
+    } catch (error) {
+      return response.badRequest({
+        message: 'Error fetching user justification pieces',
+        error: error,
+      })
     }
+  }
 
-    async verify({ request, response }: HttpContext) {
-        try {
-            const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-            justificationPiece.verification_status = 'verified'
-            justificationPiece.verified_at = DateTime.now()
-            await justificationPiece.save()
-            return response.ok(justificationPiece.serialize())
-        } catch (error) {
-            return response.badRequest({ message: 'Error verifying justification piece', error: error })
-        }
+  async verify({ request, response }: HttpContext) {
+    try {
+      const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      justificationPiece.verification_status = 'verified'
+      justificationPiece.verified_at = DateTime.now()
+      await justificationPiece.save()
+      return response.ok(justificationPiece.serialize())
+    } catch (error) {
+      return response.badRequest({ message: 'Error verifying justification piece', error: error })
     }
+  }
 
-    async reject({ request, response }: HttpContext) {
-        try {
-            const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-            justificationPiece.verification_status = 'rejected'
-            justificationPiece.verified_at = DateTime.now()
-            await justificationPiece.save()
-            return response.ok(justificationPiece.serialize())
-        } catch (error) {
-            return response.badRequest({ message: 'Error rejecting justification piece', error: error })
-        }
+  async reject({ request, response }: HttpContext) {
+    try {
+      const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      justificationPiece.verification_status = 'rejected'
+      justificationPiece.verified_at = DateTime.now()
+      await justificationPiece.save()
+      return response.ok(justificationPiece.serialize())
+    } catch (error) {
+      return response.badRequest({ message: 'Error rejecting justification piece', error: error })
     }
+  }
 }

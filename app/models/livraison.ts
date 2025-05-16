@@ -22,7 +22,8 @@ export default class Livraison extends BaseModel {
   declare status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 
   @belongsTo(() => Livreur, {
-    foreignKey: 'livreur_id',
+    foreignKey: 'livreurId',
+    localKey: 'id',
   })
   declare livreur: BelongsTo<typeof Livreur>
 
@@ -33,7 +34,10 @@ export default class Livraison extends BaseModel {
   })
   declare colis: ManyToMany<typeof Colis>
 
-  @hasMany(() => HistoriqueLivraison, { foreignKey: 'livraison_id' })
+  @hasMany(() => HistoriqueLivraison, {
+    foreignKey: 'livraisonId',
+    localKey: 'id',
+  })
   declare historique: HasMany<typeof HistoriqueLivraison>
 
   @column.dateTime({ autoCreate: true })
