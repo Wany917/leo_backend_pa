@@ -1,4 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import { DateTime } from 'luxon'
 import JustificationPiece from '#models/justification_piece'
 import { createJustificationPieceValidator } from '#validators/create_justification_piece'
 
@@ -85,6 +86,30 @@ export default class JustificationPiecesController {
         message: 'Error fetching user justification pieces',
         error: error,
       })
+    }
+  }
+
+  async verify({ request, response }: HttpContext) {
+    try {
+      const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      justificationPiece.verification_status = 'verified'
+      justificationPiece.verified_at = DateTime.now()
+      await justificationPiece.save()
+      return response.ok(justificationPiece.serialize())
+    } catch (error) {
+      return response.badRequest({ message: 'Error verifying justification piece', error: error })
+    }
+  }
+
+  async reject({ request, response }: HttpContext) {
+    try {
+      const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      justificationPiece.verification_status = 'rejected'
+      justificationPiece.verified_at = DateTime.now()
+      await justificationPiece.save()
+      return response.ok(justificationPiece.serialize())
+    } catch (error) {
+      return response.badRequest({ message: 'Error rejecting justification piece', error: error })
     }
   }
 }

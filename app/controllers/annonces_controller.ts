@@ -75,6 +75,11 @@ export default class AnnoncesController {
     }
   }
 
+  async getAllAnnonces({ request, response }: HttpContext) {
+    const annonces = await Annonce.query().preload('utilisateur' as ExtractModelRelations<Annonce>)
+    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
+  }
+
   async getUserAnnonces({ request, response }: HttpContext) {
     const userId = request.param('utilisateur_id')
     const annonces = await Annonce.query()

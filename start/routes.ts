@@ -8,6 +8,7 @@
 */
 
 import router from '@adonisjs/core/services/router'
+const SwaggerController = () => import('../app/controllers/swagger_controller.js')
 const EmailController = () => import('#controllers/send_email')
 const CodeTemporaireController = () => import('#controllers/codes_temporaire_controller')
 const AuthController = () => import('#controllers/auth_controller')
@@ -26,8 +27,13 @@ const ComplaintsController = () => import('#controllers/complaints_controller')
 const AdminController = () => import('#controllers/admin_controller')
 const ServicesController = () => import('#controllers/services_controller')
 const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
+const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 
 import { middleware } from '#start/kernel'
+
+// Routes Swagger
+router.get('/swagger', [SwaggerController, 'getJSON'])
+router.get('/docs', [SwaggerController, 'getUI'])
 
 router.get('/', async () => {
   return {
@@ -98,6 +104,7 @@ router
 
 router
   .group(() => {
+    router.get('/', [AnnonceController, 'getAllAnnonces'])
     router.post('create', [AnnonceController, 'create'])
     router.post(':id/livraisons', [LivraisonController, 'create'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
@@ -196,3 +203,16 @@ router
     router.delete(':id', [ServicesController, 'delete'])
   })
   .prefix('services')
+
+router
+  .group(() => {
+    router.post('create', [JustificationPiecesController, 'create'])
+    router.get('all', [JustificationPiecesController, 'getAll'])
+    router.get('unverified', [JustificationPiecesController, 'getUnverified'])
+    router.get('verified', [JustificationPiecesController, 'getVerified'])
+    router.get('user/:user_id', [JustificationPiecesController, 'getUserPieces'])
+    router.put('verify/:id', [JustificationPiecesController, 'verify'])
+    router.put('reject/:id', [JustificationPiecesController, 'reject'])
+    router.get(':id', [JustificationPiecesController, 'get'])
+  })
+  .prefix('justification-pieces')

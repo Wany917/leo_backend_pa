@@ -17,7 +17,10 @@ export default class Livreur extends BaseModel {
   @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
   declare user: BelongsTo<typeof Utilisateurs>
 
-  @hasMany(() => Livraison, { foreignKey: 'livreur_id' })
+  @hasMany(() => Livraison, {
+    foreignKey: 'livreurId',
+    localKey: 'id',
+  })
   declare livraisons: HasMany<typeof Livraison>
 
   @column.dateTime({ autoCreate: true })
