@@ -1,25 +1,36 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
-import Utilisateurs from '#models/utilisateurs'
+import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import Livraison from '#models/livraison'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class Livreur extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column()
-  declare availability_status: string
+  declare availabilityStatus: 'available' | 'busy' | 'offline'
 
   @column()
   declare rating: number | null
 
-  @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
+  @column()
+  declare totalDeliveries: number
+
+  @column()
+  declare vehicleType: string
+
+  @column()
+  declare vehicleNumber: string
+
+  @belongsTo(() => Utilisateurs, {
+    foreignKey: 'id',
+    localKey: 'id',
+  })
   declare user: BelongsTo<typeof Utilisateurs>
 
   @hasMany(() => Livraison, {
     foreignKey: 'livreurId',
-    localKey: 'id',
   })
   declare livraisons: HasMany<typeof Livraison>
 

@@ -1,25 +1,35 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
-
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class Commercant extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column()
-  declare store_name: string
+  declare storeName: string
 
   @column()
-  declare business_address: string | null
+  declare businessAddress: string | null
 
   @column()
-  declare contact_number: string | null
+  declare contactNumber: string | null
+
+  @column.date()
+  declare contractStartDate: DateTime
+
+  @column.date()
+  declare contractEndDate: DateTime
 
   @column()
-  declare contract_start_date: DateTime
+  declare verificationState: 'pending' | 'verified' | 'rejected'
 
-  @column()
-  declare contract_end_date: DateTime
+  @belongsTo(() => Utilisateurs, {
+    foreignKey: 'id',
+    localKey: 'id',
+  })
+  declare user: BelongsTo<typeof Utilisateurs>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

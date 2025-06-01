@@ -28,6 +28,7 @@ const AdminController = () => import('#controllers/admin_controller')
 const ServicesController = () => import('#controllers/services_controller')
 const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
+const TrackingController = () => import('#controllers/tracking_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -83,6 +84,18 @@ router
     router.post('add', [LivreurController, 'add'])
     router.get(':id/profile', [LivreurController, 'getProfile'])
     router.put(':id/profile', [LivreurController, 'updateProfile'])
+    router.get(':id/livraisons', [LivreurController, 'getLivraisons']).use(middleware.auth())
+    router
+      .get('livraisons/available', [LivreurController, 'getAvailableLivraisons'])
+      .use(middleware.auth())
+    router
+      .post(':id/livraisons/:livraisonId/accept', [LivreurController, 'acceptLivraison'])
+      .use(middleware.auth())
+    router
+      .put(':id/livraisons/:livraisonId/status', [LivreurController, 'updateLivraisonStatus'])
+      .use(middleware.auth())
+    router.get(':id/stats', [LivreurController, 'getStats']).use(middleware.auth())
+    router.put(':id/availability', [LivreurController, 'updateAvailability']).use(middleware.auth())
   })
   .prefix('livreurs')
 
@@ -99,6 +112,10 @@ router
     router.post('add', [CommercantController, 'add'])
     router.get(':id/profile', [CommercantController, 'getProfile'])
     router.put(':id/profile', [CommercantController, 'updateProfile'])
+    router.post('reject/:id', [CommercantController, 'reject'])
+    router.post('verify/:id', [CommercantController, 'verify'])
+    router.get('unverified', [CommercantController, 'getUnverified'])
+    router.get('verified', [CommercantController, 'getVerified'])
   })
   .prefix('commercants')
 
@@ -216,3 +233,20 @@ router
     router.get(':id', [JustificationPiecesController, 'get'])
   })
   .prefix('justification-pieces')
+
+router
+  .group(() => {
+    router
+      .get('livreur/:livreur_id/positions', [TrackingController, 'getLivreurPositions'])
+      .use(middleware.auth())
+    router
+      .get('livreur/:livreur_id/last-position', [TrackingController, 'getLastPosition'])
+      .use(middleware.auth())
+    router
+      .get('livraison/:livraison_id', [TrackingController, 'getLivraisonTracking'])
+      .use(middleware.auth())
+    router
+      .get('active-livreurs', [TrackingController, 'getActiveLivreurs'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('tracking')

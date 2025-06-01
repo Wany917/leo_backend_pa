@@ -57,7 +57,9 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 
-  @hasMany(() => Annonce, { foreignKey: 'utilisateur_id' })
+  @hasMany(() => Annonce, {
+    foreignKey: 'utilisateurId',
+  })
   declare annonces: HasMany<typeof Annonce>
 
   @hasOne(() => Admin, { foreignKey: 'id' })
@@ -72,7 +74,9 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
   @hasOne(() => Prestataire, { foreignKey: 'id' })
   declare prestataire: HasOne<typeof Prestataire>
 
-  @hasMany(() => JustificationPiece, { foreignKey: 'utilisateur_id' })
+  @hasMany(() => JustificationPiece, {
+    foreignKey: 'utilisateur_id',
+  })
   declare justificationPieces: HasMany<typeof JustificationPiece>
 
   static accessTokens = DbAccessTokensProvider.forModel(Utilisateurs)
