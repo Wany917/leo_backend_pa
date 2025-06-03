@@ -177,6 +177,7 @@ router
   .group(() => {
     router.get(':id', [LivraisonController, 'show'])
     router.put(':id', [LivraisonController, 'update'])
+    router.get('client/:client_id', [LivraisonController, 'getClientLivraisons'])
   })
   .prefix('livraisons')
 

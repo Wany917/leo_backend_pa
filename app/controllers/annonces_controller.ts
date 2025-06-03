@@ -16,34 +16,36 @@ export default class AnnoncesController {
       const nextId = Number(maxId) + 1
 
       const {
-        utilisateur_id,
+        utilisateur_id: utilisateurId,
         title,
         description,
         tags,
         price,
-        scheduled_date,
-        actual_delivery_date,
-        destination_address,
-        starting_address,
+        scheduled_date: scheduledDate,
+        actual_delivery_date: actualDeliveryDate,
+        destination_address: destinationAddress,
+        starting_address: startingAddress,
         priority,
-        storage_box_id,
+        storage_box_id: storageBoxId,
       } = await request.validateUsing(annonceValidator)
 
       const annonce = await Annonce.create({
         id: nextId, // Définir explicitement le prochain ID
-        utilisateurId: utilisateur_id,
+        utilisateurId: utilisateurId,
         title,
         description: description ?? null,
         price: price,
         tags: tags ?? [],
         state: 'open',
-        scheduledDate: scheduled_date ? DateTime.fromJSDate(scheduled_date) : null,
-        actualDeliveryDate: actual_delivery_date ? DateTime.fromJSDate(actual_delivery_date) : null,
-        destinationAddress: destination_address ?? null,
-        startingAddress: starting_address ?? null,
+        scheduledDate: scheduledDate ? DateTime.fromJSDate(new Date(scheduledDate)) : null,
+        actualDeliveryDate: actualDeliveryDate
+          ? DateTime.fromJSDate(new Date(actualDeliveryDate))
+          : null,
+        destinationAddress: destinationAddress ?? null,
+        startingAddress: startingAddress ?? null,
         imagePath: null,
         priority: priority ?? false,
-        storageBoxId: storage_box_id ?? null,
+        storageBoxId: storageBoxId ?? null,
       })
 
       // Gérer l'upload d'image si présent
@@ -108,12 +110,12 @@ export default class AnnoncesController {
       description,
       price,
       state,
-      scheduled_date,
-      actual_delivery_date,
-      destination_address,
-      starting_address,
+      scheduled_date: scheduledDate,
+      actual_delivery_date: actualDeliveryDate,
+      destination_address: destinationAddress,
+      starting_address: startingAddress,
       priority,
-      storage_box_id,
+      storage_box_id: storageBoxId,
     } = await request.validateUsing(updateAnnonceValidator)
 
     const annonce = await Annonce.findOrFail(request.param('id'))
@@ -123,14 +125,16 @@ export default class AnnoncesController {
       description: description ?? annonce.description,
       price: price,
       state: state ?? annonce.state,
-      scheduledDate: scheduled_date ? DateTime.fromJSDate(scheduled_date) : annonce.scheduledDate,
-      actualDeliveryDate: actual_delivery_date
-        ? DateTime.fromJSDate(actual_delivery_date)
+      scheduledDate: scheduledDate
+        ? DateTime.fromJSDate(new Date(scheduledDate))
+        : annonce.scheduledDate,
+      actualDeliveryDate: actualDeliveryDate
+        ? DateTime.fromJSDate(new Date(actualDeliveryDate))
         : annonce.actualDeliveryDate,
-      destinationAddress: destination_address ?? annonce.destinationAddress,
-      startingAddress: starting_address ?? annonce.startingAddress,
+      destinationAddress: destinationAddress ?? annonce.destinationAddress,
+      startingAddress: startingAddress ?? annonce.startingAddress,
       priority: priority ?? annonce.priority,
-      storageBoxId: storage_box_id ?? annonce.storageBoxId,
+      storageBoxId: storageBoxId ?? annonce.storageBoxId,
     })
 
     // Gérer l'upload d'image si présent
