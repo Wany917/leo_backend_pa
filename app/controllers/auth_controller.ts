@@ -89,10 +89,10 @@ export default class AuthController {
       // Récupérer l'utilisateur avec toutes ses relations
       const fullUser = await Utilisateurs.query()
         .where('id', user.id)
-        .preload('admin' as any)
-        .preload('client' as any)
-        .preload('livreur' as any)
-        .preload('prestataire' as any)
+        .preload('admin')
+        .preload('client')
+        .preload('livreur')
+        .preload('prestataire')
         .firstOrFail()
 
       // Déterminer le rôle principal de l'utilisateur

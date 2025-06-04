@@ -29,6 +29,7 @@ const ServicesController = () => import('#controllers/services_controller')
 const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 const TrackingController = () => import('#controllers/tracking_controller')
+const FilesController = () => import('#controllers/files_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -65,6 +66,7 @@ router
 router
   .group(() => {
     router.get('all', [UtilisateursController, 'getIndex'])
+    router.get('get-recent', [UtilisateursController, 'getRecent']).use(middleware.auth())
     router.get(':id', [UtilisateursController, 'get']).use(middleware.auth())
     router.put(':id', [UtilisateursController, 'update']).use(middleware.auth())
     router.post('check-password', [UtilisateursController, 'checkPassword'])
@@ -86,7 +88,7 @@ router
     router.put(':id/profile', [LivreurController, 'updateProfile'])
     router.get(':id/livraisons', [LivreurController, 'getLivraisons']).use(middleware.auth())
     router
-      .get('livraisons/available', [LivreurController, 'getAvailableLivraisons'])
+      .get('livreisons/available', [LivreurController, 'getAvailableLivraisons'])
       .use(middleware.auth())
     router
       .post(':id/livraisons/:livraisonId/accept', [LivreurController, 'acceptLivraison'])
@@ -143,7 +145,6 @@ router
   })
   .prefix('colis')
 
-// Groupe de routes administratives pour les colis
 router
   .group(() => {
     router.get('/', [ColisController, 'getAllColis'])
@@ -177,7 +178,6 @@ router
   .group(() => {
     router.get(':id', [LivraisonController, 'show'])
     router.put(':id', [LivraisonController, 'update'])
-    router.get('client/:client_id', [LivraisonController, 'getClientLivraisons'])
   })
   .prefix('livraisons')
 
@@ -206,6 +206,9 @@ router
   .group(() => {
     router.get('/', [AdminController, 'index']).use([middleware.auth(), middleware.admin()])
     router.post('/', [AdminController, 'create']).use([middleware.auth(), middleware.admin()])
+    router
+      .put('close-user/:id', [AdminController, 'closeUser'])
+      .use([middleware.auth(), middleware.admin()])
     router.get(':id', [AdminController, 'get']).use([middleware.auth(), middleware.admin()])
     router.put(':id', [AdminController, 'update']).use([middleware.auth(), middleware.admin()])
     router.delete(':id', [AdminController, 'delete']).use([middleware.auth(), middleware.admin()])
@@ -229,8 +232,8 @@ router
     router.get('unverified', [JustificationPiecesController, 'getUnverified'])
     router.get('verified', [JustificationPiecesController, 'getVerified'])
     router.get('user/:user_id', [JustificationPiecesController, 'getUserPieces'])
-    router.put('verify/:id', [JustificationPiecesController, 'verify'])
-    router.put('reject/:id', [JustificationPiecesController, 'reject'])
+    router.put('verify/:id', [JustificationPiecesController, 'verify']).use([middleware.auth(), middleware.admin()])
+    router.put('reject/:id', [JustificationPiecesController, 'reject']).use([middleware.auth(), middleware.admin()])
     router.get(':id', [JustificationPiecesController, 'get'])
   })
   .prefix('justification-pieces')
@@ -251,3 +254,29 @@ router
       .use([middleware.auth(), middleware.admin()])
   })
   .prefix('tracking')
+
+// Add these routes to the admins group
+router
+  .group(() => {
+    router.put('toggle-user-status/:userId', [AdminController, 'toggleUserStatus'])
+    .use([middleware.auth(), middleware.admin()])
+    router
+      .put('update-user/:userId', [AdminController, 'updateUser'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .post('reset-password/:userId', [AdminController, 'resetPassword'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('admins')
+
+router
+  .get('documents/:documentPath', [FilesController, 'serveDocument'])
+  .use(middleware.auth())
+
+router
+  .group(() => {
+    router.post('upload', [FilesController, 'upload']).use(middleware.auth())
+    router.delete('delete', [FilesController, 'delete']).use(middleware.auth())
+  })
+  .prefix('files')
+  

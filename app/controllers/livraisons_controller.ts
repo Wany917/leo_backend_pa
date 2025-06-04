@@ -94,42 +94,4 @@ export default class LivraisonsController {
     await livraison.load('historique')
     return response.ok({ livraison: livraison.serialize() })
   }
-
-  // ========== Récupérer les livraisons d'un client ==========
-  async getClientLivraisons({ request, response }: HttpContext) {
-    try {
-      const clientId = Number.parseInt(request.param('client_id'))
-      if (Number.isNaN(clientId)) {
-        return response.badRequest({ error: 'ID client invalide' })
-      }
-
-      const page = request.input('page', 1)
-      const limit = request.input('limit', 20)
-      const status = request.input('status')
-
-      let query = Livraison.query()
-        .where('client_id', clientId)
-        .preload('livreur')
-        .preload('colis', (colisQuery) => {
-          colisQuery.preload('annonce')
-        })
-
-      // Filtrage par statut si fourni
-      if (status) {
-        query = query.where('status', status)
-      }
-
-      const livraisons = await query.orderBy('created_at', 'desc').paginate(page, limit)
-
-      return response.ok({
-        livraisons: livraisons.serialize(),
-      })
-    } catch (error) {
-      console.error('Error fetching client deliveries:', error)
-      return response.status(500).json({
-        error: 'Une erreur est survenue lors de la récupération des livraisons',
-        details: error.message,
-      })
-    }
-  }
 }

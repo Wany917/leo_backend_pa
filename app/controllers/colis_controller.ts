@@ -47,16 +47,10 @@ export default class ColisController {
   }
 
   async create({ request, response }: HttpContext) {
-    const {
-      annonce_id: annonceId,
-      weight,
-      length,
-      width,
-      height,
-      content_description: contentDescription,
-    } = await request.validateUsing(colisValidator)
+    const { annonce_id, weight, length, width, height, content_description } =
+      await request.validateUsing(colisValidator)
 
-    const annonce = await Annonce.findOrFail(annonceId)
+    const annonce = await Annonce.findOrFail(annonce_id)
     await annonce.load('utilisateur')
 
     let trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)}`
@@ -65,16 +59,16 @@ export default class ColisController {
     }
 
     const colis = await Colis.create({
-      annonceId: annonceId,
+      annonceId: annonce_id,
       trackingNumber,
       weight,
       length,
       width,
       height,
-      contentDescription: contentDescription ?? null,
+      contentDescription: content_description ?? null,
       status: 'stored',
       locationType: 'client_address',
-      locationId: annonce.utilisateur.id,
+      locationId: null,
       currentAddress: annonce.utilisateur.address,
     })
 
@@ -82,19 +76,14 @@ export default class ColisController {
     await ColisLocationHistory.create({
       colisId: colis.id,
       locationType: 'client_address',
-      locationId: annonce.utilisateur.id,
+      locationId: null,
       address: annonce.utilisateur.address,
       description: "Colis créé et placé à l'adresse du client",
       movedAt: DateTime.now(),
     })
 
     await colis.load('annonce')
-
-    // Retourner avec trackingNumber comme clé principale
-    return response.created({
-      colis: colis.serialize(),
-      trackingNumber: colis.trackingNumber,
-    })
+    return response.created({ colis: colis.serialize() })
   }
 
   async getColis({ request, response }: HttpContext) {
@@ -130,21 +119,16 @@ export default class ColisController {
   }
 
   async updateLocation({ request, response }: HttpContext) {
-    const { tracking_number: trackingNumber } = request.params()
-    const {
-      location_type: locationType,
-      location_id: locationId,
-      address,
-      description,
-    } = request.body()
+    const { tracking_number } = request.params()
+    const { location_type, location_id, address, description } = request.body()
 
-    const colis = await Colis.findByOrFail('tracking_number', trackingNumber)
+    const colis = await Colis.findByOrFail('tracking_number', tracking_number)
 
     // Mettre à jour la localisation
-    colis.locationType = locationType
-    colis.locationId = locationId
+    colis.locationType = location_type
+    colis.locationId = location_id
 
-    if (locationType === 'client_address') {
+    if (location_type === 'client_address') {
       colis.currentAddress = address
     }
 
@@ -153,10 +137,10 @@ export default class ColisController {
     // Enregistrer l'historique
     await ColisLocationHistory.create({
       colisId: colis.id,
-      locationType: locationType,
-      locationId: locationId,
+      locationType: location_type,
+      locationId: location_id,
       address: address || null,
-      description: description || `Colis déplacé vers ${locationType}`,
+      description: description || `Colis déplacé vers ${location_type}`,
       movedAt: DateTime.now(),
     })
 

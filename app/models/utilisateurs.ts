@@ -10,6 +10,7 @@ import Admin from '#models/admin'
 import Client from '#models/client'
 import Livreur from '#models/livreur'
 import Prestataire from '#models/prestataire'
+import Commercant from '#models/commercant'
 import JustificationPiece from '#models/justification_piece'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
@@ -73,6 +74,9 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
 
   @hasOne(() => Prestataire, { foreignKey: 'id' })
   declare prestataire: HasOne<typeof Prestataire>
+
+  @hasOne(() => Commercant, { foreignKey: 'id' })
+  declare commercant: HasOne<typeof Commercant>
 
   @hasMany(() => JustificationPiece, {
     foreignKey: 'utilisateur_id',

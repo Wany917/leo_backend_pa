@@ -20,15 +20,14 @@ export default class ServicesController {
    */
   async create({ request, response }: HttpContext) {
     try {
-      const { name, description, price, duration, category } = request.body()
+      const { name, description, price, start_date, end_date } = request.body()
 
       const service = await Service.create({
         name,
         description,
         price,
-        duration: duration || null,
-        category: category || null,
-        isActive: true,
+        start_date: start_date || null,
+        end_date: end_date || null,
       })
 
       return response.created({ service: service.serialize() })
@@ -57,7 +56,7 @@ export default class ServicesController {
   async update({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
-      const { name, description, price, duration, category, isActive } = request.body()
+      const { name, description, price } = request.body()
 
       const service = await Service.findOrFail(id)
 
@@ -65,9 +64,6 @@ export default class ServicesController {
         name: name || service.name,
         description: description || service.description,
         price: price || service.price,
-        duration: duration !== undefined ? duration : service.duration,
-        category: category || service.category,
-        isActive: isActive !== undefined ? isActive : service.isActive,
         updatedAt: DateTime.now(),
       })
 
