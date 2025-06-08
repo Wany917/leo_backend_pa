@@ -8,7 +8,7 @@ import app from '@adonisjs/core/services/app'
 export default class JustificationPiecesController {
   async create({ request, response }: HttpContext) {
     try {
-      const { utilisateur_id, document_type } = await request.validateUsing(
+      const { utilisateur_id, document_type, account_type } = await request.validateUsing(
         createJustificationPieceValidator
       )
 
@@ -49,6 +49,7 @@ export default class JustificationPiecesController {
         document_type,
         file_path,
         verification_status: 'pending',
+        account_type // Store the intended account type
       })
 
       return response.created(justificationPiece.serialize())
@@ -71,7 +72,16 @@ export default class JustificationPiecesController {
   async get({ request, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-      return response.ok(justificationPiece.serialize())
+      
+      const serialized = justificationPiece.serialize()
+      
+      const responseData = {
+        ...serialized,
+        role_type: serialized.account_type,
+        user_id: serialized.utilisateur_id
+      }
+
+      return response.ok(responseData)
     } catch (error) {
       return response.notFound({ message: 'Justification piece not found', error: error })
     }

@@ -4,5 +4,6 @@ export const createJustificationPieceValidator = vine.compile(
   vine.object({
     utilisateur_id: vine.number(),
     document_type: vine.string().minLength(1),
+    account_type: vine.string().in(['livreur', 'prestataire']) // Only allow these two values
   })
 )

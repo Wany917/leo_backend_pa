@@ -19,6 +19,9 @@ export default class JustificationPiece extends BaseModel {
   @column()
   declare verification_status: string
 
+  @column()
+  declare account_type: string
+  
   @column.dateTime({ autoCreate: true })
   declare uploaded_at: DateTime
 
