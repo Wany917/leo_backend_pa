@@ -1,6 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Subscription from '#models/subscription'
-import Utilisateurs from '#models/utilisateurs'
 import { createSubscriptionValidator, updateSubscriptionValidator } from '#validators/subscription'
 import { DateTime } from 'luxon'
 
