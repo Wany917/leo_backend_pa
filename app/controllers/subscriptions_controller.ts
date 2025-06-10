@@ -63,8 +63,6 @@ export default class SubscriptionsController {
         createSubscriptionValidator
       )
 
-      const user = await Utilisateurs.findOrFail(utilisateur_id)
-
       const existingSubscription = await Subscription.query()
         .where('utilisateur_id', utilisateur_id)
         .where('status', 'active')
