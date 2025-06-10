@@ -29,6 +29,7 @@ const ServicesController = () => import('#controllers/services_controller')
 const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 const TrackingController = () => import('#controllers/tracking_controller')
+const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -251,3 +252,21 @@ router
       .use([middleware.auth(), middleware.admin()])
   })
   .prefix('tracking')
+
+// Subscription routes
+router
+  .group(() => {
+    // Public routes
+    router.get('plans', [SubscriptionsController, 'plans'])
+    
+    // User routes (authenticated)
+    router.get('user/:userId', [SubscriptionsController, 'show']).use(middleware.auth())
+    router.post('subscribe', [SubscriptionsController, 'store']).use(middleware.auth())
+    router.put(':id/cancel', [SubscriptionsController, 'cancel']).use(middleware.auth())
+    
+    // Admin routes
+    router.get('all', [SubscriptionsController, 'index']).use([middleware.auth(), middleware.admin()])
+    router.put(':id', [SubscriptionsController, 'update']).use([middleware.auth(), middleware.admin()])
+    router.post('check-expired', [SubscriptionsController, 'checkExpired']).use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('subscriptions')

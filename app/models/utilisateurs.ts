@@ -11,6 +11,7 @@ import Client from '#models/client'
 import Livreur from '#models/livreur'
 import Prestataire from '#models/prestataire'
 import JustificationPiece from '#models/justification_piece'
+import Subscription from '#models/subscription'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -78,6 +79,11 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
     foreignKey: 'utilisateur_id',
   })
   declare justificationPieces: HasMany<typeof JustificationPiece>
+
+  @hasOne(() => Subscription, {
+    foreignKey: 'utilisateur_id',
+  })
+  declare subscription: HasOne<typeof Subscription>
 
   static accessTokens = DbAccessTokensProvider.forModel(Utilisateurs)
 }

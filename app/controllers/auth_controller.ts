@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { loginValidator } from '#validators/login'
 import { registerValidator } from '#validators/register'
 import Utilisateurs from '#models/utilisateurs'
+import Subscription from '#models/subscription'
 import AccessToken from '#models/access_token'
 
 export default class AuthController {
@@ -72,6 +73,12 @@ export default class AuthController {
         city: payload.city,
         postalCode: payload.postalCode,
         country: payload.country,
+      })
+
+      await Subscription.create({
+        id: user.id,
+        subscription_type: 'free',
+        status: 'active',
       })
 
       const token = await Utilisateurs.accessTokens.create(user)
