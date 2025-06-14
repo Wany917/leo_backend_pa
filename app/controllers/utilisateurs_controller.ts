@@ -4,10 +4,32 @@ import { checkPasswordValidator } from '#validators/check_password'
 import Utilisateurs from '#models/utilisateurs'
 
 export default class UtilisateursController {
-  async getIndex({ request, response }: HttpContext) {
+  async getRecent({ response }: HttpContext) {
     try {
-      const users = await Utilisateurs.all()
-      console.log('Utilisateurs trouvés:', users.length, users)
+      const users = await Utilisateurs.query()
+        .preload('admin')
+        .preload('client')
+        .preload('livreur')
+        .preload('prestataire')
+        .orderBy('created_at', 'desc')
+        .limit(5)
+      
+      return response.ok(users.map((user) => user.serialize()))
+    } catch (error) {
+      console.error('Error in getRecent:', error)
+      return response.internalServerError({ message: 'Failed to fetch recent users' })
+    }
+  }
+
+  async getIndex({ response }: HttpContext) {
+    try {
+      const users = await Utilisateurs.query()
+        .preload('admin')
+        .preload('client')
+        .preload('livreur')
+        .preload('prestataire')
+        .preload('justificationPieces')
+      
       return response.ok(users.map((user) => user.serialize()))
     } catch (error) {
       console.error('Erreur dans getIndex:', error)
@@ -17,8 +39,14 @@ export default class UtilisateursController {
 
   async get({ request, response }: HttpContext) {
     try {
-      const user = await Utilisateurs.findOrFail(request.param('id'))
-      return response.ok(user.serialize())
+      const user = await Utilisateurs.query()
+        .where('id', request.param('id'))
+        .preload('admin')
+        .preload('client')
+        .preload('livreur')
+        .preload('prestataire')
+        .preload('commercant')
+      return response.ok(user[0])
     } catch (error) {
       return response.notFound({ message: 'Utilisateurs not found' })
     }

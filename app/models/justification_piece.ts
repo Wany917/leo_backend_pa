@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Utilisateurs from './utilisateurs.js'
 
 export default class JustificationPiece extends BaseModel {
   @column({ isPrimary: true })
@@ -15,6 +17,9 @@ export default class JustificationPiece extends BaseModel {
   declare file_path: string
 
   @column()
+  declare account_type: string // Add account_type field
+
+  @column()
   declare verification_status: string
 
   @column.dateTime({ autoCreate: true })
@@ -22,4 +27,9 @@ export default class JustificationPiece extends BaseModel {
 
   @column.dateTime()
   declare verified_at: DateTime | null
+
+  @belongsTo(() => Utilisateurs, {
+    foreignKey: 'utilisateur_id',
+  })
+  declare utilisateur: BelongsTo<typeof Utilisateurs>
 }

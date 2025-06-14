@@ -4,6 +4,7 @@ import { registerValidator } from '#validators/register'
 import Utilisateurs from '#models/utilisateurs'
 import Subscription from '#models/subscription'
 import AccessToken from '#models/access_token'
+import { DateTime } from 'luxon'
 
 export default class AuthController {
   async login({ request, response }: HttpContext) {
@@ -76,9 +77,10 @@ export default class AuthController {
       })
 
       await Subscription.create({
-        id: user.id,
+        utilisateur_id: user.id,
         subscription_type: 'free',
         status: 'active',
+        start_date: DateTime.now(),
       })
 
       const token = await Utilisateurs.accessTokens.create(user)

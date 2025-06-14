@@ -10,6 +10,7 @@ export default class extends BaseSchema {
       table.integer('utilisateur_id').unsigned()
       table.string('document_type', 255).notNullable()
       table.string('file_path', 255).notNullable()
+      table.string('account_type', 50).notNullable().defaultTo('livreur') // Add account_type field
       table
         .enum('verification_status', ['pending', 'verified', 'rejected'])
         .notNullable()

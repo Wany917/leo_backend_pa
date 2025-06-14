@@ -30,6 +30,7 @@ const AnnonceServicesController = () => import('#controllers/annonce_services_co
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 const TrackingController = () => import('#controllers/tracking_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
+const FilesController = () => import('#controllers/files_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -66,6 +67,7 @@ router
 router
   .group(() => {
     router.get('all', [UtilisateursController, 'getIndex'])
+    router.get('get-recent', [UtilisateursController, 'getRecent']).use(middleware.auth())
     router.get(':id', [UtilisateursController, 'get']).use(middleware.auth())
     router.put(':id', [UtilisateursController, 'update']).use(middleware.auth())
     router.post('check-password', [UtilisateursController, 'checkPassword'])
@@ -113,8 +115,8 @@ router
     router.post('add', [CommercantController, 'add'])
     router.get(':id/profile', [CommercantController, 'getProfile'])
     router.put(':id/profile', [CommercantController, 'updateProfile'])
-    router.post('reject/:id', [CommercantController, 'reject'])
-    router.post('verify/:id', [CommercantController, 'verify'])
+    router.put('reject/:id', [CommercantController, 'reject'])
+    router.put('verify/:id', [CommercantController, 'verify'])
     router.get('unverified', [CommercantController, 'getUnverified'])
     router.get('verified', [CommercantController, 'getVerified'])
   })
@@ -144,7 +146,6 @@ router
   })
   .prefix('colis')
 
-// Groupe de routes administratives pour les colis
 router
   .group(() => {
     router.get('/', [ColisController, 'getAllColis'])
@@ -206,7 +207,7 @@ router
 router
   .group(() => {
     router.get('/', [AdminController, 'index']).use([middleware.auth(), middleware.admin()])
-    router.post('/', [AdminController, 'create']).use([middleware.auth(), middleware.admin()])
+    router.post('/', [AdminController, 'create'])
     router.get(':id', [AdminController, 'get']).use([middleware.auth(), middleware.admin()])
     router.put(':id', [AdminController, 'update']).use([middleware.auth(), middleware.admin()])
     router.delete(':id', [AdminController, 'delete']).use([middleware.auth(), middleware.admin()])
@@ -270,3 +271,5 @@ router
     router.post('check-expired', [SubscriptionsController, 'checkExpired']).use([middleware.auth(), middleware.admin()])
   })
   .prefix('subscriptions')
+
+router.get('documents/:filename', [FilesController, 'downloadJustification'])

@@ -4,13 +4,13 @@ export default class extends BaseSeeder {
   async run() {
     const admins = [
       {
-        id: 1, // Utilisateur John Doe (id=1)
+        id: 1, // John Doe - Super Admin
         privileges: 'super',
         created_at: new Date(),
         updated_at: new Date(),
       },
       {
-        id: 4, // Utilisateur Bob Brown (id=4)
+        id: 2, // Admin Super - Basic Admin
         privileges: 'basic',
         created_at: new Date(),
         updated_at: new Date(),
