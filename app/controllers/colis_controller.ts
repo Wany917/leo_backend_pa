@@ -34,8 +34,25 @@ export default class ColisController {
 
       const colis = await query.orderBy('created_at', 'desc').paginate(page, limit)
 
+      // S'assurer que tous les colis ont un tracking_number
+      for (const colisItem of colis.all()) {
+        await colisItem.ensureTrackingNumber()
+      }
+
+      // Sérialiser avec les tracking_numbers garantis
+      const serializedColis = colis.serialize()
+      if (serializedColis.data) {
+        serializedColis.data = serializedColis.data.map((colisItem: any, index: number) => {
+          const originalColis = colis.all()[index]
+          return {
+            ...colisItem,
+            tracking_number: originalColis.getTrackingNumber(),
+          }
+        })
+      }
+
       return response.ok({
-        colis: colis.serialize(),
+        colis: serializedColis,
       })
     } catch (error) {
       console.error('Error fetching all packages:', error)
@@ -53,10 +70,7 @@ export default class ColisController {
     const annonce = await Annonce.findOrFail(annonce_id)
     await annonce.load('utilisateur')
 
-    let trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)}`
-    while (await Colis.findBy('tracking_number', trackingNumber)) {
-      trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)}`
-    }
+    const trackingNumber = await Colis.generateTrackingNumber()
 
     const colis = await Colis.create({
       annonceId: annonce_id,
@@ -94,14 +108,21 @@ export default class ColisController {
       .preload('stockage')
       .firstOrFail()
 
+    // S'assurer que le colis a un tracking_number
+    await colis.ensureTrackingNumber()
+
     // Obtenir l'historique de localisation
     const locationHistory = await ColisLocationHistory.query()
       .where('colis_id', colis.id)
       .orderBy('moved_at', 'desc')
 
+    // Sérialiser avec le tracking_number garanti
+    const serializedColis = colis.serialize()
+    serializedColis.tracking_number = colis.getTrackingNumber()
+
     return response.ok({
-      colis: colis.serialize(),
-      locationHistory: locationHistory.map((loc) => loc.serialize()),
+      colis: serializedColis,
+      history: locationHistory.map((loc) => loc.serialize()),
     })
   }
 
@@ -144,9 +165,50 @@ export default class ColisController {
       movedAt: DateTime.now(),
     })
 
+    // S'assurer que le colis a un tracking_number
+    await colis.ensureTrackingNumber()
+
+    const serializedColis = colis.serialize()
+    serializedColis.tracking_number = colis.getTrackingNumber()
+
     return response.ok({
       message: 'Localisation du colis mise à jour',
-      colis: colis.serialize(),
+      colis: serializedColis,
     })
+  }
+
+  // Méthode pour récupérer les colis d'un utilisateur
+  async getUserColis({ request, response }: HttpContext) {
+    try {
+      const userId = request.param('userId')
+
+      const colis = await Colis.query()
+        .preload('annonce', (annonceQuery) => {
+          annonceQuery.preload('utilisateur')
+        })
+        .whereHas('annonce', (annonceQuery) => {
+          annonceQuery.where('utilisateur_id', userId)
+        })
+        .orderBy('created_at', 'desc')
+
+      // S'assurer que tous les colis ont un tracking_number
+      for (const colisItem of colis) {
+        await colisItem.ensureTrackingNumber()
+      }
+
+      return response.ok({
+        colis: colis.map((c) => {
+          const serialized = c.serialize()
+          serialized.tracking_number = c.getTrackingNumber()
+          return serialized
+        }),
+      })
+    } catch (error) {
+      console.error('Error fetching user packages:', error)
+      return response.status(500).json({
+        error: "Une erreur est survenue lors de la récupération des colis de l'utilisateur",
+        details: error.message,
+      })
+    }
   }
 }

@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import Commercant from '#models/commercant'
 import Utilisateurs from '#models/utilisateurs'
 import { commercantValidator } from '#validators/add_commercant'

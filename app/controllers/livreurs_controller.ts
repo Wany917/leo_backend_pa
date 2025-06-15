@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import Livreur from '#models/livreur'
 import Utilisateurs from '#models/utilisateurs'
 import Livraison from '#models/livraison'

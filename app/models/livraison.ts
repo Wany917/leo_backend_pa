@@ -26,6 +26,9 @@ export default class Livraison extends BaseModel {
   @column()
   declare status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 
+  @column({ columnName: 'is_partial' })
+  declare isPartial: boolean
+
   @belongsTo(() => Livreur, {
     foreignKey: 'livreurId',
     localKey: 'id',

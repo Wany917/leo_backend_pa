@@ -12,7 +12,7 @@ export default class extends BaseSchema {
       table.boolean('is_read').notNullable().defaultTo(false)
       table.timestamp('created_at')
       table.timestamp('updated_at')
-      
+
       table.foreign('sender_id').references('id').inTable('utilisateurs').onDelete('CASCADE')
       table.foreign('receiver_id').references('id').inTable('utilisateurs').onDelete('CASCADE')
     })

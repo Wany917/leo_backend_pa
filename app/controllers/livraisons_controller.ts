@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import Livraison from '#models/livraison'
 import Annonce from '#models/annonce'
 import Client from '#models/client'
@@ -93,5 +93,30 @@ export default class LivraisonsController {
     await livraison.load('colis')
     await livraison.load('historique')
     return response.ok({ livraison: livraison.serialize() })
+  }
+
+  // Méthode pour récupérer les livraisons d'un client
+  async getClientLivraisons({ request, response }: HttpContext) {
+    try {
+      const clientId = request.param('clientId')
+
+      const livraisons = await Livraison.query()
+        .where('client_id', clientId)
+        .preload('livreur', (livreurQuery) => {
+          livreurQuery.preload('user')
+        })
+        .preload('colis')
+        .orderBy('created_at', 'desc')
+
+      return response.ok({
+        livraisons: livraisons.map((l) => l.serialize()),
+      })
+    } catch (error) {
+      console.error('Error fetching client deliveries:', error)
+      return response.status(500).json({
+        error: 'Une erreur est survenue lors de la récupération des livraisons du client',
+        details: error.message,
+      })
+    }
   }
 }

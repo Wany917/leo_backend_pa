@@ -1,7 +1,7 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import JustificationPiece from '#models/justification_piece'
-import Utilisateur from '#models/utilisateurs'
+import Utilisateurs from '#models/utilisateurs'
 import { createJustificationPieceValidator } from '#validators/create_justification_piece'
 import app from '@adonisjs/core/services/app'
 
@@ -21,7 +21,7 @@ export default class JustificationPiecesController {
         return response.badRequest({ message: 'No file provided' })
       }
 
-      const userData = await Utilisateur.findOrFail(utilisateur_id)
+      const userData = await Utilisateurs.findOrFail(utilisateur_id)
 
       const now = new Date()
       const year = now.getFullYear()

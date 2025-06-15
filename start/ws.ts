@@ -448,6 +448,287 @@ app.ready(() => {
         }
       }
     })
+
+    // ==================== ÉVÉNEMENTS LIVRAISONS PARTIELLES ====================
+
+    // Demander une livraison partielle
+    socket.on('request_partial_delivery', async (data) => {
+      try {
+        const { livraison_id, segments } = data
+        const clientId = socket.data.userId
+
+        // Vérifier que l'utilisateur est le propriétaire de la livraison
+        const livraison = await Livraison.find(livraison_id)
+        if (!livraison) {
+          socket.emit('error', { message: 'Livraison introuvable' })
+          return
+        }
+
+        // Charger les relations pour vérifier la propriété
+        await livraison.load('colis', (query) => {
+          query.preload('annonce', (annonceQuery) => {
+            annonceQuery.preload('utilisateur' as any)
+          })
+        })
+
+        if (livraison.colis.length === 0 || livraison.colis[0].annonce.utilisateurId !== clientId) {
+          socket.emit('error', { message: 'Non autorisé' })
+          return
+        }
+
+        // Émettre la demande à tous les livreurs disponibles
+        const availableLivreurs = await Livreur.query()
+          .where('availability_status', 'available')
+          .preload('user' as any)
+
+        const partialDeliveryRequest = {
+          original_livraison_id: livraison_id,
+          segments: segments,
+          client_id: clientId,
+          total_distance: segments.reduce((sum: number, seg: any) => sum + seg.distance, 0),
+          total_cost: segments.reduce(
+            (sum: number, seg: any) => sum + (seg.estimated_cost || 0),
+            0
+          ),
+          requested_at: new Date().toISOString(),
+        }
+
+        availableLivreurs.forEach((livreur) => {
+          const livreurSocket = userSockets.get(livreur.id)
+          if (livreurSocket) {
+            livreurSocket.emit('partial_delivery_request', partialDeliveryRequest)
+          }
+        })
+
+        // Confirmer au client
+        socket.emit('partial_delivery_request_sent', {
+          segments_count: segments.length,
+          notified_livreurs: availableLivreurs.length,
+        })
+      } catch (error) {
+        console.error('Error requesting partial delivery:', error)
+        socket.emit('error', { message: 'Erreur lors de la demande de livraison partielle' })
+      }
+    })
+
+    // Proposer un segment
+    socket.on('propose_segment', async (data) => {
+      try {
+        const { segment_id, proposed_cost, estimated_duration } = data
+        const livreurId = socket.data.userId
+
+        // Vérifier que l'utilisateur est un livreur
+        const livreur = await Livreur.find(livreurId)
+        if (!livreur) {
+          socket.emit('error', { message: "Vous n'êtes pas un livreur" })
+          return
+        }
+
+        await livreur.load('user' as any)
+
+        // Créer la proposition (ici on simule, dans la vraie implémentation il faudrait sauvegarder en DB)
+        const proposal = {
+          segment_id: segment_id,
+          livreur_id: livreurId,
+          livreur: livreur.serialize(),
+          proposed_cost: proposed_cost,
+          estimated_duration: estimated_duration,
+          proposed_at: new Date().toISOString(),
+        }
+
+        // Notifier le client propriétaire du segment
+        // (Il faudrait récupérer le client_id depuis la DB via le segment)
+        io.emit('segment_proposal', proposal)
+
+        // Confirmer au livreur
+        socket.emit('segment_proposal_sent', {
+          segment_id: segment_id,
+          proposed_cost: proposed_cost,
+        })
+      } catch (error) {
+        console.error('Error proposing segment:', error)
+        socket.emit('error', { message: 'Erreur lors de la proposition de segment' })
+      }
+    })
+
+    // Accepter une proposition de segment
+    socket.on('accept_segment_proposal', async (data) => {
+      try {
+        const { segment_id, livreur_id } = data
+        const clientId = socket.data.userId
+
+        // Charger les informations du livreur
+        const livreur = await Livreur.find(livreur_id)
+        if (!livreur) {
+          socket.emit('error', { message: 'Livreur introuvable' })
+          return
+        }
+
+        await livreur.load('user' as any)
+
+        const acceptanceEvent = {
+          segment_id: segment_id,
+          livreur_id: livreur_id,
+          livreur: livreur.serialize(),
+          client_id: clientId,
+          accepted_at: new Date().toISOString(),
+        }
+
+        // Notifier le livreur accepté
+        const livreurSocket = userSockets.get(livreur_id)
+        if (livreurSocket) {
+          livreurSocket.emit('segment_accepted', acceptanceEvent)
+        }
+
+        // Notifier le client
+        socket.emit('segment_accepted', acceptanceEvent)
+
+        // Notifier les autres livreurs que le segment n'est plus disponible
+        io.emit('segment_no_longer_available', { segment_id: segment_id })
+      } catch (error) {
+        console.error('Error accepting segment proposal:', error)
+        socket.emit('error', { message: "Erreur lors de l'acceptation de la proposition" })
+      }
+    })
+
+    // Mettre à jour le statut d'un segment
+    socket.on('update_segment_status', async (data) => {
+      try {
+        const { segment_id, status, location } = data
+        const livreurId = socket.data.userId
+
+        const statusUpdate = {
+          segment_id: segment_id,
+          status: status,
+          livreur_id: livreurId,
+          updated_at: new Date().toISOString(),
+          location: location,
+        }
+
+        // Notifier tous les participants de la livraison
+        io.emit('segment_status_updated', statusUpdate)
+
+        // Confirmer au livreur
+        socket.emit('segment_status_updated_success', statusUpdate)
+      } catch (error) {
+        console.error('Error updating segment status:', error)
+        socket.emit('error', { message: 'Erreur lors de la mise à jour du statut' })
+      }
+    })
+
+    // Initier une coordination entre livreurs
+    socket.on('initiate_coordination', async (data) => {
+      try {
+        const {
+          livraison_id: livraisonId,
+          current_segment_id: currentSegmentId,
+          next_segment_id: nextSegmentId,
+          handover_location: handoverLocation,
+        } = data
+        const currentLivreurId = socket.data.userId
+
+        const coordinationEvent = {
+          livraison_id: livraisonId,
+          current_segment_id: currentSegmentId,
+          next_segment_id: nextSegmentId,
+          handover_location: handoverLocation,
+          current_livreur_id: currentLivreurId,
+          estimated_handover_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // +30 min
+        }
+
+        // Notifier tous les participants
+        io.emit('delivery_coordination', coordinationEvent)
+      } catch (error) {
+        console.error('Error initiating coordination:', error)
+        socket.emit('error', { message: "Erreur lors de l'initiation de la coordination" })
+      }
+    })
+
+    // Confirmer une remise de colis
+    socket.on('confirm_package_handover', async (data) => {
+      try {
+        const {
+          livraison_id: livraisonId,
+          from_segment_id: fromSegmentId,
+          to_segment_id: toSegmentId,
+          handover_location: handoverLocation,
+          verification_code: verificationCode,
+        } = data
+        const livreurId = socket.data.userId
+
+        const handoverEvent = {
+          livraison_id: livraisonId,
+          from_segment_id: fromSegmentId,
+          to_segment_id: toSegmentId,
+          from_livreur_id: livreurId,
+          to_livreur_id: data.to_livreur_id, // À récupérer depuis la DB
+          handover_location: handoverLocation,
+          handover_time: new Date().toISOString(),
+          verification_code: verificationCode,
+        }
+
+        // Notifier tous les participants
+        io.emit('package_handover', handoverEvent)
+      } catch (error) {
+        console.error('Error confirming handover:', error)
+        socket.emit('error', { message: 'Erreur lors de la confirmation de remise' })
+      }
+    })
+
+    // Envoyer un message de chat de groupe
+    socket.on('send_group_chat_message', async (data) => {
+      try {
+        const { livraison_id: livraisonId, content, message_type: messageType } = data
+        const senderId = socket.data.userId
+
+        // Charger les informations de l'expéditeur
+        const sender = await Utilisateurs.find(senderId)
+        if (!sender) {
+          socket.emit('error', { message: 'Utilisateur introuvable' })
+          return
+        }
+
+        // Créer le message (simulation, à sauvegarder en DB)
+        const message = {
+          id: Date.now(), // Simulation d'un ID
+          content: content,
+          sender_id: senderId,
+          created_at: new Date().toISOString(),
+        }
+
+        const groupChatEvent = {
+          livraison_id: livraisonId,
+          message: message,
+          sender: sender.serialize(),
+          participants: [], // À récupérer depuis la DB
+          message_type: messageType || 'general',
+        }
+
+        // Notifier tous les participants de la livraison
+        io.to(`delivery_${livraisonId}`).emit('group_chat_message', groupChatEvent)
+      } catch (error) {
+        console.error('Error sending group chat message:', error)
+        socket.emit('error', { message: "Erreur lors de l'envoi du message" })
+      }
+    })
+
+    // Rejoindre le chat de coordination d'une livraison
+    socket.on('join_delivery_coordination', async (data) => {
+      const { livraison_id: livraisonId } = data
+      socket.join(`delivery_${livraisonId}`)
+      console.log(
+        `User ${socket.data.userId} joined delivery coordination room: delivery_${livraisonId}`
+      )
+    })
+
+    // Quitter le chat de coordination d'une livraison
+    socket.on('leave_delivery_coordination', async (data) => {
+      const { livraison_id: livraisonId } = data
+      socket.leave(`delivery_${livraisonId}`)
+      console.log(
+        `User ${socket.data.userId} left delivery coordination room: delivery_${livraisonId}`
+      )
+    })
   })
 
   // Écouter les événements du système

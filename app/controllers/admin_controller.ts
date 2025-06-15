@@ -101,7 +101,7 @@ export default class AdminController {
         return response.status(404).send({ error_message: 'User not found', user: user })
       }
       user.state = 'closed'
-      console.log("User closed")
+      console.log('User closed')
       await user.save()
       return response.ok({ message: 'User closed successfully' })
     } catch (error) {
@@ -113,18 +113,18 @@ export default class AdminController {
     try {
       const userId = request.param('userId')
       const { state } = request.body()
-      
+
       const user = await Utilisateurs.find(userId)
       if (!user) {
         return response.status(404).send({ error_message: 'User not found' })
       }
-      
+
       user.state = state // 'open' or 'closed'
       await user.save()
-      
-      return response.ok({ 
+
+      return response.ok({
         message: `User ${state === 'open' ? 'activated' : 'deactivated'} successfully`,
-        user: user
+        user: user,
       })
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to toggle user status', error })
@@ -135,24 +135,24 @@ export default class AdminController {
     try {
       const userId = request.param('userId')
       const userData = request.body()
-      
+
       const user = await Utilisateurs.find(userId)
       if (!user) {
         return response.status(404).send({ error_message: 'User not found' })
       }
-      
+
       // Update user fields
-      Object.keys(userData).forEach(key => {
+      Object.keys(userData).forEach((key) => {
         if (userData[key] !== undefined && key !== 'id') {
-          (user as any)[key] = userData[key]
+          ;(user as any)[key] = userData[key]
         }
       })
-      
+
       await user.save()
-      
-      return response.ok({ 
+
+      return response.ok({
         message: 'User updated successfully',
-        user: user
+        user: user,
       })
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to update user', error })
@@ -163,30 +163,30 @@ export default class AdminController {
     try {
       const userId = request.param('userId')
       const { newPassword } = request.body()
-      
+
       // Validate input
       if (!newPassword || newPassword.length < 6) {
-        return response.status(400).send({ 
-          error_message: 'Password must be at least 6 characters long' 
+        return response.status(400).send({
+          error_message: 'Password must be at least 6 characters long',
         })
       }
-      
+
       const user = await Utilisateurs.find(userId)
       if (!user) {
         return response.status(404).send({ error_message: 'User not found' })
       }
-      
+
       // Hash the new password
       user.password = await hash.make(newPassword)
       await user.save()
-      
-      return response.ok({ 
-        message: 'Password reset successfully'
+
+      return response.ok({
+        message: 'Password reset successfully',
       })
     } catch (error) {
-      return response.status(500).send({ 
-        error_message: 'Failed to reset password', 
-        error 
+      return response.status(500).send({
+        error_message: 'Failed to reset password',
+        error,
       })
     }
   }

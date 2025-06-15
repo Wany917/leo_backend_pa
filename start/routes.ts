@@ -30,6 +30,10 @@ const AnnonceServicesController = () => import('#controllers/annonce_services_co
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 const TrackingController = () => import('#controllers/tracking_controller')
 const FilesController = () => import('#controllers/files_controller')
+const TrajetsPlanifiesController = () => import('#controllers/trajets_planifies_controller')
+const PartialDeliveryController = () => import('#controllers/partial_delivery_controller')
+const DeliverySegmentController = () => import('#controllers/delivery_segment_controller')
+const CoordinationController = () => import('#controllers/coordination_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -142,6 +146,7 @@ router
     router.get(':tracking_number', [ColisController, 'getColis'])
     router.get(':tracking_number/location-history', [ColisController, 'getLocationHistory'])
     router.post(':tracking_number/update-location', [ColisController, 'updateLocation'])
+    router.get('user/:userId', [ColisController, 'getUserColis']).use(middleware.auth())
   })
   .prefix('colis')
 
@@ -178,6 +183,9 @@ router
   .group(() => {
     router.get(':id', [LivraisonController, 'show'])
     router.put(':id', [LivraisonController, 'update'])
+    router
+      .get('client/:clientId', [LivraisonController, 'getClientLivraisons'])
+      .use(middleware.auth())
   })
   .prefix('livraisons')
 
@@ -232,8 +240,12 @@ router
     router.get('unverified', [JustificationPiecesController, 'getUnverified'])
     router.get('verified', [JustificationPiecesController, 'getVerified'])
     router.get('user/:user_id', [JustificationPiecesController, 'getUserPieces'])
-    router.put('verify/:id', [JustificationPiecesController, 'verify']).use([middleware.auth(), middleware.admin()])
-    router.put('reject/:id', [JustificationPiecesController, 'reject']).use([middleware.auth(), middleware.admin()])
+    router
+      .put('verify/:id', [JustificationPiecesController, 'verify'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .put('reject/:id', [JustificationPiecesController, 'reject'])
+      .use([middleware.auth(), middleware.admin()])
     router.get(':id', [JustificationPiecesController, 'get'])
   })
   .prefix('justification-pieces')
@@ -258,8 +270,9 @@ router
 // Add these routes to the admins group
 router
   .group(() => {
-    router.put('toggle-user-status/:userId', [AdminController, 'toggleUserStatus'])
-    .use([middleware.auth(), middleware.admin()])
+    router
+      .put('toggle-user-status/:userId', [AdminController, 'toggleUserStatus'])
+      .use([middleware.auth(), middleware.admin()])
     router
       .put('update-user/:userId', [AdminController, 'updateUser'])
       .use([middleware.auth(), middleware.admin()])
@@ -269,9 +282,7 @@ router
   })
   .prefix('admins')
 
-router
-  .get('documents/:documentPath', [FilesController, 'serveDocument'])
-  .use(middleware.auth())
+router.get('documents/:documentPath', [FilesController, 'serveDocument']).use(middleware.auth())
 
 router
   .group(() => {
@@ -279,4 +290,84 @@ router
     router.delete('delete', [FilesController, 'delete']).use(middleware.auth())
   })
   .prefix('files')
-  
+
+router
+  .group(() => {
+    router.post('create', [TrajetsPlanifiesController, 'create']).use(middleware.auth())
+    router
+      .get('livreur/:livreurId', [TrajetsPlanifiesController, 'getByLivreur'])
+      .use(middleware.auth())
+    router.get('active', [TrajetsPlanifiesController, 'getActive'])
+    router.put(':id', [TrajetsPlanifiesController, 'update']).use(middleware.auth())
+    router.delete(':id', [TrajetsPlanifiesController, 'delete']).use(middleware.auth())
+  })
+  .prefix('trajets-planifies')
+
+// ==================== ROUTES LIVRAISONS PARTIELLES ====================
+
+router
+  .group(() => {
+    router.get('/', [PartialDeliveryController, 'index']).use(middleware.auth())
+    router.post('/', [PartialDeliveryController, 'create']).use(middleware.auth())
+    router.get(':id', [PartialDeliveryController, 'show']).use(middleware.auth())
+    router
+      .get('user/:userId', [PartialDeliveryController, 'getUserDeliveries'])
+      .use(middleware.auth())
+    router.patch(':id/cancel', [PartialDeliveryController, 'cancel']).use(middleware.auth())
+    router.post('calculate-cost', [PartialDeliveryController, 'calculateCost'])
+    router.post('optimize-route', [PartialDeliveryController, 'optimizeRoute'])
+  })
+  .prefix('partial-deliveries')
+
+router
+  .group(() => {
+    router.get('available', [DeliverySegmentController, 'getAvailable']).use(middleware.auth())
+    router
+      .get(':id/proposals', [DeliverySegmentController, 'getWithProposals'])
+      .use(middleware.auth())
+    router.post('propose', [DeliverySegmentController, 'propose']).use(middleware.auth())
+    router
+      .post('accept-proposal', [DeliverySegmentController, 'acceptProposal'])
+      .use(middleware.auth())
+    router.patch(':id/status', [DeliverySegmentController, 'updateStatus']).use(middleware.auth())
+    router.get(':id/history', [DeliverySegmentController, 'getHistory']).use(middleware.auth())
+    router
+      .get(':id/available-livreurs', [DeliverySegmentController, 'getAvailableLivreurs'])
+      .use(middleware.auth())
+  })
+  .prefix('segments')
+
+router
+  .group(() => {
+    router.patch(':id/reject', [DeliverySegmentController, 'rejectProposal']).use(middleware.auth())
+  })
+  .prefix('segment-proposals')
+
+router
+  .group(() => {
+    router.post('initiate', [CoordinationController, 'initiate']).use(middleware.auth())
+    router
+      .get('deliveries/:livraisonId', [CoordinationController, 'getCoordinationInfo'])
+      .use(middleware.auth())
+    router.post('handover', [CoordinationController, 'confirmHandover']).use(middleware.auth())
+    router
+      .post('verification-code', [CoordinationController, 'generateVerificationCode'])
+      .use(middleware.auth())
+    router
+      .post('validate-code', [CoordinationController, 'validateVerificationCode'])
+      .use(middleware.auth())
+  })
+  .prefix('coordination')
+
+// Routes pour les statistiques des livraisons partielles
+router
+  .group(() => {
+    router.get(':id/partial-stats', [LivreurController, 'getPartialStats']).use(middleware.auth())
+  })
+  .prefix('livreurs')
+
+router
+  .group(() => {
+    router.get(':id/partial-stats', [ClientController, 'getPartialStats']).use(middleware.auth())
+  })
+  .prefix('clients')

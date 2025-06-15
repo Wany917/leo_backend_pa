@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import { userUpdateValidator } from '#validators/user_put'
 import { checkPasswordValidator } from '#validators/check_password'
 import Utilisateurs from '#models/utilisateurs'
@@ -6,7 +6,11 @@ import Utilisateurs from '#models/utilisateurs'
 export default class UtilisateursController {
   async getIndex({ response }: HttpContext) {
     try {
-      const users = await Utilisateurs.query().preload('admin').preload('livreur').preload('prestataire').preload('justificationPieces')
+      const users = await Utilisateurs.query()
+        .preload('admin')
+        .preload('livreur')
+        .preload('prestataire')
+        .preload('justificationPieces')
       return response.ok(users.map((user) => user.serialize()))
     } catch (error) {
       console.error('Erreur dans getIndex:', error)
@@ -28,7 +32,7 @@ export default class UtilisateursController {
       const users = await Utilisateurs.query()
         .select('id', 'first_name', 'last_name', 'address', 'created_at')
         .preload('admin')
-        .preload('livreur') 
+        .preload('livreur')
         .preload('prestataire')
         .orderBy('createdAt', 'desc')
         .limit(5)
@@ -37,9 +41,9 @@ export default class UtilisateursController {
         return response.notFound({ message: 'No recent users found' })
       }
 
-      const usersWithRoles = users.map(user => {
-        let role = 'client' 
-        
+      const usersWithRoles = users.map((user) => {
+        let role = 'client'
+
         if (user.$preloaded.admin) role = 'admin'
         else if (user.$preloaded.livreur) role = 'livreur'
         else if (user.$preloaded.prestataire) role = 'prestataire'
@@ -50,16 +54,16 @@ export default class UtilisateursController {
           last_name: user.last_name,
           address: user.address,
           role: role,
-          created_at: user.createdAt
+          created_at: user.createdAt,
         }
       })
 
       return response.ok(usersWithRoles)
     } catch (error) {
       console.error('Error in getRecent:', error)
-      return response.internalServerError({ 
+      return response.internalServerError({
         message: 'An error occurred while fetching recent users',
-        error: error.message 
+        error: error.message,
       })
     }
   }

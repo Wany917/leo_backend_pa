@@ -12,8 +12,8 @@ export default class Colis extends BaseModel {
   @column({ columnName: 'annonce_id' })
   declare annonceId: number
 
-  @column()
-  declare trackingNumber: string
+  @column({ columnName: 'tracking_number' })
+  declare trackingNumber: string | null
 
   @column()
   declare weight: number
@@ -64,4 +64,38 @@ export default class Colis extends BaseModel {
     foreignKey: 'colisId',
   })
   declare stockage: HasOne<typeof StockageColi>
+
+  /**
+   * Génère un tracking number unique
+   */
+  static async generateTrackingNumber(): Promise<string> {
+    let trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)
+      .toString()
+      .padStart(6, '0')}`
+
+    while (await Colis.findBy('tracking_number', trackingNumber)) {
+      trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)
+        .toString()
+        .padStart(6, '0')}`
+    }
+
+    return trackingNumber
+  }
+
+  /**
+   * S'assure que le colis a un tracking number
+   */
+  async ensureTrackingNumber(): Promise<void> {
+    if (!this.trackingNumber) {
+      this.trackingNumber = await Colis.generateTrackingNumber()
+      await this.save()
+    }
+  }
+
+  /**
+   * Retourne le tracking number ou génère un fallback basé sur l'ID
+   */
+  getTrackingNumber(): string {
+    return this.trackingNumber || `COLIS-${this.id.toString().padStart(6, '0')}`
+  }
 }

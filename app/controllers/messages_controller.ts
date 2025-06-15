@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http'
+import { HttpContext } from '@adonisjs/core/http'
 import Message from '#models/message'
 import Utilisateurs from '#models/utilisateurs'
 import { messageValidator } from '#validators/message'

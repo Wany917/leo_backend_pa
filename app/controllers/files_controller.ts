@@ -24,25 +24,25 @@ export default class FilesController {
     try {
       // Replace all %20 with spaces
       const documentPath = request.param('documentPath').replace(/%20/g, ' ')
-      
+
       // Security check: prevent directory traversal
       if (documentPath.includes('..')) {
         return response.status(400).send({ error_message: 'Invalid document path' })
       }
-      
+
       // Handle justifications subfolder
-      let fullPath;
+      let fullPath
       if (documentPath.startsWith('justifications/')) {
         fullPath = join(app.tmpPath('uploads'), documentPath)
       } else {
         fullPath = join(app.tmpPath('uploads'), 'justifications', documentPath)
       }
-      
+
       if (!existsSync(fullPath)) {
         console.log(fullPath)
         return response.status(404).send({ error_message: 'Document not found' })
       }
-      
+
       return response.download(fullPath)
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to serve document', error })
@@ -52,38 +52,38 @@ export default class FilesController {
   public async delete({ request, response }: HttpContext) {
     try {
       // Get filePath from request body instead of URL parameter
-      const { filePath } = request.body();
-      
+      const { filePath } = request.body()
+
       if (!filePath) {
-        return response.status(400).send({ error_message: 'File path is required' });
+        return response.status(400).send({ error_message: 'File path is required' })
       }
-  
+
       // Clean the file path
-      const cleanFilePath = filePath.replace(/%20/g, ' ');
-  
+      const cleanFilePath = filePath.replace(/%20/g, ' ')
+
       if (cleanFilePath.includes('..')) {
-        return response.status(400).send({ error_message: 'Invalid file path' });
+        return response.status(400).send({ error_message: 'Invalid file path' })
       }
-  
+
       // Handle justifications subfolder path
-      let fullPath;
+      let fullPath
       if (cleanFilePath.startsWith('justifications/')) {
-        fullPath = join(app.tmpPath('uploads'), cleanFilePath);
+        fullPath = join(app.tmpPath('uploads'), cleanFilePath)
       } else {
-        fullPath = join(app.tmpPath('uploads'), 'justifications', cleanFilePath);
+        fullPath = join(app.tmpPath('uploads'), 'justifications', cleanFilePath)
       }
-  
+
       if (!existsSync(fullPath)) {
-        return response.status(404).send({ error_message: 'File not found' });
+        return response.status(404).send({ error_message: 'File not found' })
       }
-  
+
       // Delete the file
-      
-      await import('node:fs/promises').then(fs => fs.unlink(fullPath));
-  
-      return response.ok({ message: 'File deleted successfully' });
+
+      await import('node:fs/promises').then((fs) => fs.unlink(fullPath))
+
+      return response.ok({ message: 'File deleted successfully' })
     } catch (error) {
-      return response.status(500).send({ message: 'Failed to delete file', error: error });
+      return response.status(500).send({ message: 'Failed to delete file', error: error })
     }
   }
 }

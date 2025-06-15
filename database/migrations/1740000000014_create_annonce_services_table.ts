@@ -8,17 +8,9 @@ export default class extends BaseSchema {
       table.integer('annonce_id').unsigned().notNullable()
       table.integer('service_id').unsigned().notNullable()
 
-      table
-        .foreign('annonce_id')
-        .references('id')
-        .inTable('annonces')
-        .onDelete('CASCADE')
+      table.foreign('annonce_id').references('id').inTable('annonces').onDelete('CASCADE')
 
-      table
-        .foreign('service_id')
-        .references('id')
-        .inTable('services')
-        .onDelete('CASCADE')
+      table.foreign('service_id').references('id').inTable('services').onDelete('CASCADE')
     })
   }
 
