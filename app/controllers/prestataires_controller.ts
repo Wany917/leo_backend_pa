@@ -2,11 +2,37 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Prestataire from '#models/prestataire'
 import Utilisateurs from '#models/utilisateurs'
 import { prestataireValidator } from '#validators/add_prestataire'
-
+import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 export default class PrestatairesController {
+  /**
+   * Liste tous les prestataires
+   */
+  async index({ response }: HttpContext) {
+    try {
+      const prestataires = await Prestataire.query()
+        .preload('user' as ExtractModelRelations<Prestataire>)
+        .orderBy('created_at', 'desc')
+
+      return response.ok({
+        prestataires: prestataires.map((prestataire) => ({
+          ...prestataire.serialize(),
+          user: prestataire.user ? {
+            ...prestataire.user.serialize(),
+            password: undefined // Remove password from response
+          } : null
+        }))
+      })
+    } catch (error) {
+      return response.status(500).send({ 
+        error_message: 'Failed to fetch prestataires', 
+        error: error.message 
+      })
+    }
+  }
+
   async add({ request, response }: HttpContext) {
     try {
-      const { utilisateur_id, service_type } = await request.validateUsing(prestataireValidator)
+      const { utilisateur_id } = await request.validateUsing(prestataireValidator)
 
       const prestataireAlreadyLinked = await Prestataire.findBy('id', utilisateur_id)
       if (prestataireAlreadyLinked) {
@@ -15,7 +41,6 @@ export default class PrestatairesController {
 
       const prestataire = await Prestataire.create({
         id: utilisateur_id,
-        service_type: service_type || null,
         rating: null,
       })
 

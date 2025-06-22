@@ -8,7 +8,7 @@ export default class extends BaseSeeder {
       // Justification pieces for delivery people (livreurs)
       {
         utilisateur_id: 5, // Bob Brown (Livreur)
-        document_type: 'driving_license',
+        document_type: 'Driving Licence',
         file_path: '/uploads/justifications/bob_driving_license.pdf',
         account_type: 'livreur', // Add account_type
         verification_status: 'verified',
@@ -17,7 +17,7 @@ export default class extends BaseSeeder {
       },
       {
         utilisateur_id: 5, // Bob Brown (Livreur)
-        document_type: 'identity_card',
+        document_type: 'Id Card',
         file_path: '/uploads/justifications/bob_identity.pdf',
         account_type: 'livreur', // Add account_type
         verification_status: 'verified',
@@ -26,7 +26,7 @@ export default class extends BaseSeeder {
       },
       {
         utilisateur_id: 6, // Charlie Wilson (Livreur)
-        document_type: 'driving_license',
+        document_type: 'Driving Licence',
         file_path: '/uploads/justifications/charlie_driving_license.pdf',
         account_type: 'livreur', // Add account_type
         verification_status: 'verified',

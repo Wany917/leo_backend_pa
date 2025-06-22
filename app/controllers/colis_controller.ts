@@ -4,6 +4,7 @@ import Annonce from '#models/annonce'
 import ColisLocationHistory from '#models/colis_location_history'
 import { colisValidator } from '#validators/create_coli'
 import { DateTime } from 'luxon'
+import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ColisController {
   // Méthode pour récupérer tous les colis (pour les administrateurs)
@@ -15,7 +16,7 @@ export default class ColisController {
       const search = request.input('search')
 
       let query = Colis.query().preload('annonce', (annonceQuery) => {
-        annonceQuery.preload('utilisateur')
+        annonceQuery.preload('utilisateur' as ExtractModelRelations<Annonce>)
       })
 
       // Filtrage par statut si fourni
@@ -57,7 +58,7 @@ export default class ColisController {
     } = await request.validateUsing(colisValidator)
 
     const annonce = await Annonce.findOrFail(annonceId)
-    await annonce.load('utilisateur')
+    await annonce.load('utilisateur' as ExtractModelRelations<Annonce>)
 
     let trackingNumber = `COLIS-${Math.floor(Math.random() * 1e6)}`
     while (await Colis.findBy('tracking_number', trackingNumber)) {

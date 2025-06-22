@@ -11,6 +11,8 @@ export default class UtilisateursController {
         .preload('client')
         .preload('livreur')
         .preload('prestataire')
+        .preload('commercant')
+        .preload('justificationPieces')
         .orderBy('created_at', 'desc')
         .limit(5)
       
@@ -28,6 +30,7 @@ export default class UtilisateursController {
         .preload('client')
         .preload('livreur')
         .preload('prestataire')
+        .preload('commercant')
         .preload('justificationPieces')
       
       return response.ok(users.map((user) => user.serialize()))
@@ -46,6 +49,8 @@ export default class UtilisateursController {
         .preload('livreur')
         .preload('prestataire')
         .preload('commercant')
+        .preload('justificationPieces')
+
       return response.ok(user[0])
     } catch (error) {
       return response.notFound({ message: 'Utilisateurs not found' })

@@ -102,18 +102,20 @@ export default class AuthController {
         .preload('client' as any)
         .preload('livreur' as any)
         .preload('prestataire' as any)
+        .preload('commercant' as any)
         .firstOrFail()
 
-      // Déterminer le rôle principal de l'utilisateur
-      let role = 'user'
-      if (fullUser.admin) role = 'admin'
-      else if (fullUser.livreur) role = 'livreur'
-      else if (fullUser.client) role = 'client'
-      else if (fullUser.prestataire) role = 'prestataire'
+      // Check if account is closed, banned, or deactivated
+      if (fullUser.state === 'closed' || fullUser.state === 'banned') {
+        return response.status(403).send({
+          error_message: 'Account unavailable. Please contact support.',
+          account_status: fullUser.state,
+          redirect_to_home: true
+        })
+      }
 
       // Ajouter le rôle à la réponse
       const userData = fullUser.serialize()
-      userData.role = role
 
       return response.ok(userData)
     } catch (error) {

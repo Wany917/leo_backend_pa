@@ -2,8 +2,24 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Client from '#models/client'
 import Utilisateurs from '#models/utilisateurs'
 import { clientValidator } from '#validators/add_client'
+import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ClientController {
+  async index({ response }: HttpContext) {
+    try {
+      const clients = await Client.query().preload('user' as unknown as ExtractModelRelations<Client>)
+      const clientsData = clients.map(client => ({
+        id: client.id,
+        name: `${client.user.first_name} ${client.user.last_name}`,
+        email: client.user.email,
+        loyalty_points: client.loyalty_points
+      }))
+      return response.ok(clientsData)
+    } catch (error) {
+      return response.internalServerError({ message: 'Failed to fetch clients', error_code: error })
+    }
+  }
+
   async add({ request, response }: HttpContext) {
     try {
       const { utilisateur_id } = await request.validateUsing(clientValidator)

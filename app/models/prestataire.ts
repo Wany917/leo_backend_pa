@@ -17,7 +17,7 @@ export default class Prestataire extends BaseModel {
   @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
   declare user: BelongsTo<typeof Utilisateurs>
 
-  @hasMany(() => Service, { foreignKey: 'prestataire_id' })
+  @hasMany(() => Service, { foreignKey: 'prestataired' })
   declare services: HasMany<typeof Service>
 
   @column.dateTime({ autoCreate: true })

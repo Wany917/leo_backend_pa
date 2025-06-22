@@ -26,6 +26,7 @@ const WharehousesController = () => import('#controllers/wharehouses_controller'
 const ComplaintsController = () => import('#controllers/complaints_controller')
 const AdminController = () => import('#controllers/admin_controller')
 const ServicesController = () => import('#controllers/services_controller')
+const ServiceTypesController = () => import('#controllers/service_types_controller')
 const AnnonceServicesController = () => import('#controllers/annonce_services_controller')
 const JustificationPiecesController = () => import('#controllers/justification_pieces_controller')
 const TrackingController = () => import('#controllers/tracking_controller')
@@ -76,6 +77,7 @@ router
 
 router
   .group(() => {
+    router.get('/', [ClientController, 'index'])
     router.post('add', [ClientController, 'add'])
     router.get(':id/profile', [ClientController, 'getProfile'])
     router.put(':id/profile', [ClientController, 'updateProfile'])
@@ -104,11 +106,12 @@ router
 
 router
   .group(() => {
+    router.get('/', [PrestataireController, 'index'])
     router.post('add', [PrestataireController, 'add'])
-    router.get(':id/profile', [PrestataireController, 'getProfile'])
-    router.put(':id/profile', [PrestataireController, 'updateProfile'])
+    router.get(':id', [PrestataireController, 'getProfile'])
+    router.put(':id', [PrestataireController, 'updateProfile'])
   })
-  .prefix('prestataires')
+  .prefix('/prestataires')
 
 router
   .group(() => {
@@ -208,9 +211,15 @@ router
   .group(() => {
     router.get('/', [AdminController, 'index']).use([middleware.auth(), middleware.admin()])
     router.post('/', [AdminController, 'create'])
+    router
+      .post('create-user', [AdminController, 'createUserWithEmail'])
+      .use([middleware.auth(), middleware.admin()])
     router.get(':id', [AdminController, 'get']).use([middleware.auth(), middleware.admin()])
     router.put(':id', [AdminController, 'update']).use([middleware.auth(), middleware.admin()])
     router.delete(':id', [AdminController, 'delete']).use([middleware.auth(), middleware.admin()])
+    router
+      .put('toggle-user-status/:id', [AdminController, 'toggleUserStatus'])
+      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('admins')
 
@@ -223,6 +232,17 @@ router
     router.delete(':id', [ServicesController, 'delete'])
   })
   .prefix('services')
+
+router
+  .group(() => {
+    router.get('/', [ServiceTypesController, 'index'])
+    router.post('/', [ServiceTypesController, 'store'])
+    router.put(':id/toggle-status', [ServiceTypesController, 'toggleStatus'])
+    router.get(':id', [ServiceTypesController, 'show'])
+    router.put(':id', [ServiceTypesController, 'update'])
+    router.delete(':id', [ServiceTypesController, 'destroy'])
+  })
+  .prefix('service-types')
 
 router
   .group(() => {
@@ -259,16 +279,22 @@ router
   .group(() => {
     // Public routes
     router.get('plans', [SubscriptionsController, 'plans'])
-    
+
     // User routes (authenticated)
     router.get('user/:userId', [SubscriptionsController, 'show']).use(middleware.auth())
     router.post('subscribe', [SubscriptionsController, 'store']).use(middleware.auth())
     router.put(':id/cancel', [SubscriptionsController, 'cancel']).use(middleware.auth())
-    
+
     // Admin routes
-    router.get('all', [SubscriptionsController, 'index']).use([middleware.auth(), middleware.admin()])
-    router.put(':id', [SubscriptionsController, 'update']).use([middleware.auth(), middleware.admin()])
-    router.post('check-expired', [SubscriptionsController, 'checkExpired']).use([middleware.auth(), middleware.admin()])
+    router
+      .get('all', [SubscriptionsController, 'index'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .put(':id', [SubscriptionsController, 'update'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .post('check-expired', [SubscriptionsController, 'checkExpired'])
+      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('subscriptions')
 
