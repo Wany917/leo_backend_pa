@@ -30,12 +30,14 @@ export const updateAnnonceValidator = vine.compile(
     title: vine.string().minLength(3).maxLength(50).optional(),
     description: vine.string().minLength(10).maxLength(500).optional(),
     price: vine.number(),
-    state: vine.enum(['open', 'pending', 'closed']).optional(),
-    scheduled_date: vine.string().optional(),
+    type: vine.enum(['transport_colis', 'service_personne']).optional(),
+    status: vine.enum(['active', 'pending', 'completed', 'cancelled']).optional(),
+    desired_date: vine.string().optional(),
     actual_delivery_date: vine.string().optional(),
-    destination_address: vine.string().optional(),
-    starting_address: vine.string().optional(),
+    end_location: vine.string().optional(),
+    start_location: vine.string().optional(),
     priority: vine.boolean().optional(),
     storage_box_id: vine.string().optional(),
+    insurance_amount: vine.number().optional(),
   })
 )

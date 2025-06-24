@@ -11,7 +11,31 @@ export default class AuthController {
     try {
       const { email, password } = await request.validateUsing(loginValidator)
 
+      // 🔍 DEBUG : Vérifier le payload exact reçu
+      console.log('🔍 DEBUG LOGIN - Raw payload:', { email, password })
+      console.log('🔍 DEBUG LOGIN - Email:', email)
+      console.log('🔍 DEBUG LOGIN - Password:', password)
+      console.log('🔍 DEBUG LOGIN - Password length:', password.length)
+      console.log(
+        '🔍 DEBUG LOGIN - Password chars:',
+        password.split('').map((c) => c.charCodeAt(0))
+      )
+
+      const existingUser = await Utilisateurs.findBy('email', email)
+      console.log('🔍 DEBUG LOGIN - User exists:', !!existingUser)
+
+      if (existingUser) {
+        console.log('🔍 DEBUG LOGIN - User state:', existingUser.state)
+        console.log('🔍 DEBUG LOGIN - User password hash exists:', !!existingUser.password)
+        console.log(
+          '🔍 DEBUG LOGIN - User password hash start:',
+          existingUser.password?.substring(0, 20)
+        )
+      }
+
+      console.log('🔍 DEBUG LOGIN - About to call verifyCredentials...')
       const user = await Utilisateurs.verifyCredentials(email, password)
+      console.log('🔍 DEBUG LOGIN - verifyCredentials SUCCESS!')
 
       if (user.state === 'closed') {
         return response.status(403).send({
@@ -32,7 +56,9 @@ export default class AuthController {
         token: token.value!.release(),
       })
     } catch (error) {
-      console.log(error)
+      console.log('🔴 LOGIN ERROR:', error)
+      console.log('🔴 ERROR MESSAGE:', error.message)
+      console.log('🔴 ERROR CODE:', error.code)
       return response.status(401).send({ error_message: 'Unauthorized access', error: error })
     }
   }
@@ -40,6 +66,8 @@ export default class AuthController {
   async register({ request, response }: HttpContext) {
     try {
       const payload = await request.validateUsing(registerValidator)
+
+      console.log('🔍 DEBUG REGISTER - Payload received:', payload)
 
       const existingUtilisateurs = await Utilisateurs.findBy('email', payload.email)
       if (existingUtilisateurs) {
@@ -76,6 +104,12 @@ export default class AuthController {
         country: payload.country,
       })
 
+      // 🔍 DEBUG : Vérifier la création de l'utilisateur
+      console.log('🔍 DEBUG REGISTER - User created with ID:', user.id)
+      console.log('🔍 DEBUG REGISTER - Email saved:', user.email)
+      console.log('🔍 DEBUG REGISTER - Password hash exists:', !!user.password)
+      console.log('🔍 DEBUG REGISTER - Password hash length:', user.password?.length || 0)
+
       await Subscription.create({
         utilisateur_id: user.id,
         subscription_type: 'free',
@@ -87,7 +121,23 @@ export default class AuthController {
 
       return response.created({ user: user, token: token.value!.release() })
     } catch (error) {
-      response.status(400).send({ error_message: error })
+      console.log('🔴 REGISTER ERROR:', error)
+      console.log('🔴 ERROR MESSAGE:', error.message)
+      console.log('🔴 ERROR TYPE:', typeof error)
+
+      // ✅ EXTRAIRE CORRECTEMENT LE MESSAGE D'ERREUR
+      let errorMessage = 'Registration failed'
+
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object' && error.message) {
+        errorMessage = error.message
+      }
+
+      console.log('🔴 FINAL ERROR MESSAGE:', errorMessage)
+      response.status(400).send({ error_message: errorMessage })
     }
   }
 
@@ -110,7 +160,7 @@ export default class AuthController {
         return response.status(403).send({
           error_message: 'Account unavailable. Please contact support.',
           account_status: fullUser.state,
-          redirect_to_home: true
+          redirect_to_home: true,
         })
       }
 

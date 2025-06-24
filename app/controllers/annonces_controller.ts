@@ -21,12 +21,15 @@ export default class AnnoncesController {
         description,
         tags,
         price,
-        scheduled_date: scheduledDate,
+        type,
+        status,
+        desired_date: desiredDate,
         actual_delivery_date: actualDeliveryDate,
-        destination_address: destinationAddress,
-        starting_address: startingAddress,
+        end_location: endLocation,
+        start_location: startLocation,
         priority,
         storage_box_id: storageBoxId,
+        insurance_amount: insuranceAmount,
       } = await request.validateUsing(annonceValidator)
 
       const annonce = await Annonce.create({
@@ -36,16 +39,18 @@ export default class AnnoncesController {
         description: description ?? null,
         price: price,
         tags: tags ?? [],
-        state: 'open',
-        scheduledDate: scheduledDate ? DateTime.fromJSDate(new Date(scheduledDate)) : null,
+        type: type ?? 'transport_colis', // Valeur par défaut
+        status: status ?? 'active', // Nouveau: remplace state: 'open'
+        desiredDate: desiredDate ? DateTime.fromJSDate(new Date(desiredDate)) : null,
         actualDeliveryDate: actualDeliveryDate
           ? DateTime.fromJSDate(new Date(actualDeliveryDate))
           : null,
-        destinationAddress: destinationAddress ?? null,
-        startingAddress: startingAddress ?? null,
+        endLocation: endLocation ?? null, // Nouveau: remplace destinationAddress
+        startLocation: startLocation ?? null, // Nouveau: remplace startingAddress
         imagePath: null,
         priority: priority ?? false,
         storageBoxId: storageBoxId ?? null,
+        insuranceAmount: insuranceAmount ?? 0, // Nouveau champ
       })
 
       // Gérer l'upload d'image si présent
@@ -109,13 +114,15 @@ export default class AnnoncesController {
       title,
       description,
       price,
-      state,
-      scheduled_date: scheduledDate,
+      type,
+      status,
+      desired_date: desiredDate,
       actual_delivery_date: actualDeliveryDate,
-      destination_address: destinationAddress,
-      starting_address: startingAddress,
+      end_location: endLocation,
+      start_location: startLocation,
       priority,
       storage_box_id: storageBoxId,
+      insurance_amount: insuranceAmount,
     } = await request.validateUsing(updateAnnonceValidator)
 
     const annonce = await Annonce.findOrFail(request.param('id'))
@@ -124,17 +131,17 @@ export default class AnnoncesController {
       title: title ?? annonce.title,
       description: description ?? annonce.description,
       price: price,
-      state: state ?? annonce.state,
-      scheduledDate: scheduledDate
-        ? DateTime.fromJSDate(new Date(scheduledDate))
-        : annonce.scheduledDate,
+      type: type ?? annonce.type,
+      status: status ?? annonce.status, // Nouveau: remplace state
+      desiredDate: desiredDate ? DateTime.fromJSDate(new Date(desiredDate)) : annonce.desiredDate, // Nouveau: remplace scheduledDate
       actualDeliveryDate: actualDeliveryDate
         ? DateTime.fromJSDate(new Date(actualDeliveryDate))
         : annonce.actualDeliveryDate,
-      destinationAddress: destinationAddress ?? annonce.destinationAddress,
-      startingAddress: startingAddress ?? annonce.startingAddress,
+      endLocation: endLocation ?? annonce.endLocation, // Nouveau: remplace destinationAddress
+      startLocation: startLocation ?? annonce.startLocation, // Nouveau: remplace startingAddress
       priority: priority ?? annonce.priority,
       storageBoxId: storageBoxId ?? annonce.storageBoxId,
+      insuranceAmount: insuranceAmount ?? annonce.insuranceAmount, // Nouveau champ
     })
 
     // Gérer l'upload d'image si présent
@@ -169,12 +176,12 @@ export default class AnnoncesController {
       const formData = request.all()
 
       // Traiter les dates spéciales
-      if (formData.scheduled_date && typeof formData.scheduled_date === 'string') {
+      if (formData.desired_date && typeof formData.desired_date === 'string') {
         // Convertir YYYY-MM-DD en objet DateTime
         try {
-          annonce.scheduledDate = DateTime.fromFormat(formData.scheduled_date, 'yyyy-MM-dd')
+          annonce.desiredDate = DateTime.fromFormat(formData.desired_date, 'yyyy-MM-dd')
         } catch (e) {
-          console.error('Error parsing scheduled_date:', e)
+          console.error('Error parsing desired_date:', e)
         }
       }
 
@@ -193,14 +200,17 @@ export default class AnnoncesController {
       if (formData.title) annonce.title = formData.title
       if (formData.description) annonce.description = formData.description
       if (formData.price !== undefined) annonce.price = formData.price
-      if (formData.state) annonce.state = formData.state
-      if (formData.destination_address) annonce.destinationAddress = formData.destination_address
-      if (formData.starting_address) annonce.startingAddress = formData.starting_address
+      if (formData.type) annonce.type = formData.type
+      if (formData.status) annonce.status = formData.status // Nouveau: remplace state
+      if (formData.end_location) annonce.endLocation = formData.end_location // Nouveau: remplace destination_address
+      if (formData.start_location) annonce.startLocation = formData.start_location // Nouveau: remplace starting_address
       if (formData.priority !== undefined) {
         // Convertir la chaîne en booléen
         annonce.priority = formData.priority === 'true' || formData.priority === true
       }
       if (formData.storage_box_id) annonce.storageBoxId = formData.storage_box_id
+      if (formData.insurance_amount !== undefined)
+        annonce.insuranceAmount = formData.insurance_amount
 
       // Gérer l'upload d'image si présent
       const image = request.file('image')

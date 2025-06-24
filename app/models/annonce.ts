@@ -25,10 +25,13 @@ export default class Annonce extends BaseModel {
   declare tags: string[]
 
   @column()
-  declare state: 'open' | 'pending' | 'closed'
+  declare status: 'active' | 'pending' | 'completed' | 'cancelled'
 
-  @column.dateTime({ columnName: 'scheduled_date' })
-  declare scheduledDate: DateTime | null
+  @column()
+  declare type: 'transport_colis' | 'service_personne'
+
+  @column.dateTime({ columnName: 'desired_date' })
+  declare desiredDate: DateTime | null
 
   @column.dateTime({ columnName: 'actual_delivery_date' })
   declare actualDeliveryDate: DateTime | null
@@ -39,20 +42,23 @@ export default class Annonce extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  @column()
-  declare destinationAddress: string | null
+  @column({ columnName: 'end_location' })
+  declare endLocation: string | null
 
-  @column()
-  declare startingAddress: string | null
+  @column({ columnName: 'start_location' })
+  declare startLocation: string | null
 
-  @column()
+  @column({ columnName: 'image_path' })
   declare imagePath: string | null
 
   @column()
   declare priority: boolean
 
-  @column()
+  @column({ columnName: 'storage_box_id' })
   declare storageBoxId: string | null
+
+  @column({ columnName: 'insurance_amount' })
+  declare insuranceAmount: number
 
   @belongsTo(() => Utilisateurs, {
     foreignKey: 'utilisateurId',

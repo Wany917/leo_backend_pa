@@ -1,102 +1,125 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
-import { DateTime } from 'luxon'
 
 export default class extends BaseSeeder {
   async run() {
-    const now = DateTime.now().toJSDate()
-    const tomorrow = DateTime.now().plus({ days: 1 }).toJSDate()
-    const nextWeek = DateTime.now().plus({ days: 7 }).toJSDate()
-
     const annonces = [
+      // Annonces de transport de colis
       {
         id: 1,
-        utilisateur_id: 1, // John Doe (Client)
-        title: 'Livraison de colis urgent',
-        description: 'Besoin de livrer un colis de documents importants de Paris à Bagneux',
-        price: 25.5,
-        tags: ['urgent', 'documents', 'Paris', 'Bagneux'],
-        state: 'open',
-        scheduled_date: tomorrow,
-        actual_delivery_date: null,
-        destination_address: '24 Av. Albert Petit, 92220 Bagneux',
-        starting_address: '61 Rue de Ménilmontant, 75020 Paris',
-        image_path: null,
-        priority: true,
-        storage_box_id: null,
-        created_at: now,
-        updated_at: now,
+        utilisateur_id: 3, // Marie Dupont (Paris)
+        title: 'Transport Paris → Lyon - Documents urgents',
+        description:
+          'Besoin de transporter des documents confidentiels de Paris à Lyon dans les 24h. Package sécurisé requis.',
+        type: 'transport_colis',
+        price: 45.0,
+        status: 'active',
+        start_location: 'Paris 75001',
+        end_location: 'Lyon 69002',
+        desired_date: new Date('2025-01-25'),
+        insurance_amount: 200.0,
+        created_at: new Date(),
+        updated_at: new Date(),
       },
       {
         id: 2,
-        utilisateur_id: 1, // John Doe (Client)
-        title: 'Livraison de produits alimentaires',
-        description: 'Livraison de produits frais du marché de Rungis à mon domicile',
-        price: 35.0,
-        tags: ['frais', 'alimentaire', 'Rungis', 'Paris'],
-        state: 'pending',
-        scheduled_date: nextWeek,
-        actual_delivery_date: null,
-        destination_address: '61 Rue de Ménilmontant, 75020 Paris',
-        starting_address: 'Marché de Rungis, 94150 Rungis',
-        image_path: null,
-        priority: false,
-        storage_box_id: null,
-        created_at: now,
-        updated_at: now,
+        utilisateur_id: 4, // Jean Martin (Paris)
+        title: 'Livraison Marseille → Paris - Produits artisanaux',
+        description:
+          'Transport de savons artisanaux fragiles depuis Marseille. Manipulation délicate nécessaire.',
+        type: 'transport_colis',
+        price: 55.0,
+        status: 'active',
+        start_location: 'Marseille 13006',
+        end_location: 'Paris 75008',
+        desired_date: new Date('2025-01-28'),
+        insurance_amount: 150.0,
+        created_at: new Date(),
+        updated_at: new Date(),
       },
+
+      // Annonces de services à la personne
       {
         id: 3,
-        utilisateur_id: 2, // Jane Smith (Client)
-        title: 'Transport de meubles',
-        description: "Besoin d'aide pour transporter une petite table et deux chaises",
-        price: 50.0,
-        tags: ['meubles', 'transport', 'Paris'],
-        state: 'open',
-        scheduled_date: nextWeek,
-        actual_delivery_date: null,
-        destination_address: '24 Av. Albert Petit, 92220 Bagneux',
-        starting_address: '35 Boulevard de Magenta, 75010 Paris',
-        image_path: null,
-        priority: false,
-        storage_box_id: null,
-        created_at: now,
-        updated_at: now,
+        utilisateur_id: 7, // Isabelle Moreau (Prestataire transport personnes)
+        title: 'Transport médical Paris → Banlieue',
+        description:
+          'Service de transport médical pour personnes à mobilité réduite. Véhicule adapté et accompagnement.',
+        type: 'service_personne',
+        price: 35.0,
+        status: 'active',
+        start_location: 'Paris 75006',
+        end_location: 'Versailles 78000',
+        desired_date: new Date('2025-01-26'),
+        insurance_amount: 0.0,
+        created_at: new Date(),
+        updated_at: new Date(),
       },
       {
         id: 4,
-        utilisateur_id: 3, // Alice Johnson (Client)
-        title: 'Livraison express de médicaments',
-        description: 'Besoin urgent de faire livrer des médicaments de la pharmacie à mon domicile',
-        price: 15.0,
-        tags: ['urgent', 'médicaments', 'santé'],
-        state: 'closed',
-        scheduled_date: DateTime.now().minus({ days: 2 }).toJSDate(),
-        actual_delivery_date: DateTime.now().minus({ days: 2 }).toJSDate(),
-        destination_address: '8 Rue de la Paix, 75002 Paris',
-        starting_address: '12 Avenue des Champs-Élysées, 75008 Paris',
-        image_path: null,
-        priority: true,
-        storage_box_id: null,
-        created_at: DateTime.now().minus({ days: 3 }).toJSDate(),
-        updated_at: now,
+        utilisateur_id: 8, // Thomas Petit (Prestataire services ménagers)
+        title: 'Ménage complet appartement - Lille',
+        description:
+          'Service de ménage complet pour appartement 3 pièces. Produits écologiques inclus.',
+        type: 'service_personne',
+        price: 80.0,
+        status: 'active',
+        start_location: 'Lille 59000',
+        end_location: 'Lille 59000',
+        desired_date: new Date('2025-01-30'),
+        insurance_amount: 0.0,
+        created_at: new Date(),
+        updated_at: new Date(),
       },
+
+      // Annonces commercants
       {
         id: 5,
-        utilisateur_id: 1, // John Doe (Client)
-        title: 'Livraison de vêtements',
-        description: 'Récupérer un costume chez le tailleur et le livrer à mon bureau',
-        price: 20.0,
-        tags: ['vêtements', 'costume', 'bureau'],
-        state: 'open',
-        scheduled_date: nextWeek,
-        actual_delivery_date: null,
-        destination_address: '5 Rue de Rivoli, 75001 Paris',
-        starting_address: '61 Rue de Ménilmontant, 75020 Paris',
-        image_path: null,
-        priority: false,
-        storage_box_id: null,
-        created_at: now,
-        updated_at: now,
+        utilisateur_id: 9, // François Dubois (Commercant épicerie)
+        title: 'Livraison produits épicerie fine',
+        description:
+          'Livraison de paniers gourmets dans Paris et proche banlieue. Produits frais et de qualité.',
+        type: 'transport_colis',
+        price: 15.0,
+        status: 'active',
+        start_location: 'Paris 75018',
+        end_location: 'Île-de-France',
+        desired_date: new Date('2025-01-27'),
+        insurance_amount: 50.0,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id: 6,
+        utilisateur_id: 10, // Nathalie Sanchez (Commercant savonnerie)
+        title: 'Distribution savons naturels - Marseille',
+        description:
+          'Livraison de commandes de savons naturels faits main dans Marseille et environs.',
+        type: 'transport_colis',
+        price: 12.0,
+        status: 'active',
+        start_location: 'Marseille 13006',
+        end_location: 'Bouches-du-Rhône',
+        desired_date: new Date('2025-01-29'),
+        insurance_amount: 30.0,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+
+      // Annonce complétée pour test
+      {
+        id: 7,
+        utilisateur_id: 3, // Marie Dupont
+        title: 'Colis livré - Cadeau anniversaire',
+        description: "Cadeau d'anniversaire livré avec succès à ma sœur à Marseille.",
+        type: 'transport_colis',
+        status: 'completed',
+        start_location: 'Paris 75011',
+        end_location: 'Marseille 13001',
+        price: 60.0,
+        insurance_amount: 100.0,
+        desired_date: new Date('2025-01-15'),
+        created_at: new Date('2025-01-10'),
+        updated_at: new Date('2025-01-15'),
       },
     ]
 
