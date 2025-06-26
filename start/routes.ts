@@ -280,19 +280,56 @@ router
 
 router
   .group(() => {
-    router.get('/', [AdminController, 'index']).use([middleware.auth(), middleware.admin()])
-    router.post('/', [AdminController, 'create'])
-    router
-      .post('create-user', [AdminController, 'createUserWithEmail'])
-      .use([middleware.auth(), middleware.admin()])
-    router.get(':id', [AdminController, 'get']).use([middleware.auth(), middleware.admin()])
-    router.put(':id', [AdminController, 'update']).use([middleware.auth(), middleware.admin()])
-    router.delete(':id', [AdminController, 'delete']).use([middleware.auth(), middleware.admin()])
+    router.get('/', [AdminController, 'index']).use(middleware.auth())
+    router.post('/', [AdminController, 'create']).use(middleware.auth())
+    router.post('create-user', [AdminController, 'createUserWithEmail']).use(middleware.auth())
+    router.get(':id', [AdminController, 'get']).use(middleware.auth())
+    router.put(':id', [AdminController, 'update']).use(middleware.auth())
+    router.delete(':id', [AdminController, 'delete']).use(middleware.auth())
     router
       .put('toggle-user-status/:id', [AdminController, 'toggleUserStatus'])
-      .use([middleware.auth(), middleware.admin()])
+      .use(middleware.auth())
+    router.delete('delete-user/:id', [AdminController, 'deleteUser']).use(middleware.auth())
 
-    // Analytics géographiques avancées pour Leaflet.js
+    // ==============================
+    // NOUVELLES ROUTES SERVICES ADMIN
+    // ==============================
+
+    // Dashboard et analytics services
+    router
+      .get('services/dashboard', [AdminController, 'getServicesDashboard'])
+      .use(middleware.auth())
+    router
+      .get('services/analytics', [ServicesController, 'getServiceAnalytics'])
+      .use(middleware.auth())
+
+    // Gestion des prestataires
+    router
+      .post('prestataires/:id/validate', [AdminController, 'validatePrestataire'])
+      .use(middleware.auth())
+
+    // Gestion des types de services
+    router.get('service-types', [AdminController, 'getServiceTypes']).use(middleware.auth())
+    router
+      .put('service-types/:id/toggle', [AdminController, 'toggleServiceType'])
+      .use(middleware.auth())
+
+    // Validation des services
+    router
+      .post('services/:id/validate', [ServicesController, 'validateService'])
+      .use(middleware.auth())
+
+    // Facturation mensuelle automatique
+    router
+      .get('facturation/mensuelle', [AdminController, 'generateFacturationMensuelle'])
+      .use(middleware.auth())
+
+    // Calendrier des prestataires
+    router
+      .get('prestataires/:prestataireId/calendar', [ServicesController, 'getProviderCalendar'])
+      .use(middleware.auth())
+
+    // Analytics géographiques et géolocalisation
     router
       .get('analytics/geo/heatmap', [AdminController, 'getDeliveryHeatmap'])
       .use([middleware.auth(), middleware.admin()])

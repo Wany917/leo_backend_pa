@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, manyToMany } from '@adonisjs/lucid/orm'
-import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, manyToMany, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, ManyToMany, HasMany } from '@adonisjs/lucid/types/relations'
 import Prestataire from '#models/prestataire'
 import Client from '#models/client'
 import Annonce from '#models/annonce'
@@ -63,4 +63,34 @@ export default class Service extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  /**
+   * Méthode pour calculer la note moyenne du service
+   */
+  async getAverageRating(): Promise<number> {
+    // Simulation - dans un vrai projet, calculer depuis la table ratings
+    return 4.5
+  }
+
+  /**
+   * Méthode pour vérifier si le service est réservable
+   */
+  isBookable(): boolean {
+    const now = DateTime.now()
+    return this.isActive && this.status === 'scheduled' && this.start_date > now
+  }
+
+  /**
+   * Méthode pour calculer la commission EcoDeli
+   */
+  calculateCommission(rate: number = 0.15): number {
+    return this.price * rate
+  }
+
+  /**
+   * Méthode pour calculer le montant prestataire
+   */
+  calculateProviderAmount(commissionRate: number = 0.15): number {
+    return this.price * (1 - commissionRate)
+  }
 }

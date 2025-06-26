@@ -248,72 +248,100 @@ export default class JustificationPiecesController {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
       const { comments } = request.only(['comments'])
 
-      justificationPiece.verification_status = 'verified'
-      justificationPiece.verified_at = DateTime.now()
-
-      // Ajouter les commentaires si fournis (nous devrons ajouter cette colonne à la DB ou utiliser un champ existant)
-      if (comments) {
-        // Pour l'instant, nous allons utiliser un champ existant ou en créer un nouveau
-        // justificationPiece.review_comments = comments
-      }
-
-      await justificationPiece.save()
-
-      // 🎯 NOUVEAU: Créer automatiquement le rôle correspondant
+      // 🎯 AMÉLIORATION: Vérifier si l'utilisateur a déjà le rôle
       const userId = justificationPiece.utilisateur_id
       const accountType = justificationPiece.account_type
 
-      console.log(`🎯 Creating role for user ${userId} with account type: ${accountType}`)
+      console.log(`🎯 Processing verification for user ${userId} with account type: ${accountType}`)
+
+      let roleAlreadyExists = false
+      try {
+        switch (accountType) {
+          case 'livreur':
+            const existingLivreur = await Livreur.find(userId)
+            roleAlreadyExists = !!existingLivreur
+            break
+          case 'prestataire':
+            const existingPrestataire = await Prestataire.find(userId)
+            roleAlreadyExists = !!existingPrestataire
+            break
+          case 'commercant':
+            const existingCommercant = await Commercant.find(userId)
+            roleAlreadyExists = !!existingCommercant
+            break
+        }
+      } catch (roleCheckError) {
+        console.error(`❌ Error checking existing role:`, roleCheckError)
+      }
+
+      console.log(`🔍 Role already exists for user ${userId}: ${roleAlreadyExists}`)
+
+      // Si le rôle existe déjà, auto-valider TOUS les documents en attente pour ce type de compte
+      if (roleAlreadyExists) {
+        console.log(`🚀 Auto-validating all pending documents for user ${userId} (${accountType})`)
+
+        const pendingDocuments = await JustificationPiece.query()
+          .where('utilisateur_id', userId)
+          .where('account_type', accountType)
+          .where('verification_status', 'pending')
+
+        console.log(`📋 Found ${pendingDocuments.length} pending documents to auto-validate`)
+
+        for (const doc of pendingDocuments) {
+          doc.verification_status = 'verified'
+          doc.verified_at = DateTime.now()
+          await doc.save()
+          console.log(`✅ Auto-validated document ${doc.id} (${doc.document_type})`)
+        }
+
+        return response.ok({
+          status: 'success',
+          message: `All ${pendingDocuments.length} pending documents auto-validated (role already exists)`,
+          data: {
+            validatedDocuments: pendingDocuments.length,
+            reason: 'Role already exists for user',
+          },
+        })
+      }
+
+      // Logique normale si le rôle n'existe pas encore
+      justificationPiece.verification_status = 'verified'
+      justificationPiece.verified_at = DateTime.now()
+      await justificationPiece.save()
+
+      console.log(`🎯 Creating new role for user ${userId} with account type: ${accountType}`)
 
       try {
         switch (accountType) {
           case 'livreur':
-            // Vérifier si le livreur existe déjà
-            const existingLivreur = await Livreur.find(userId)
-            if (!existingLivreur) {
-              await Livreur.create({
-                id: userId,
-                availabilityStatus: 'available',
-                rating: null,
-              })
-              console.log(`✅ Livreur role created for user ${userId}`)
-            } else {
-              console.log(`ℹ️ Livreur role already exists for user ${userId}`)
-            }
+            await Livreur.create({
+              id: userId,
+              availabilityStatus: 'available',
+              rating: null,
+            })
+            console.log(`✅ Livreur role created for user ${userId}`)
             break
 
           case 'prestataire':
-            // Vérifier si le prestataire existe déjà
-            const existingPrestataire = await Prestataire.find(userId)
-            if (!existingPrestataire) {
-              await Prestataire.create({
-                id: userId,
-                service_type: null,
-                rating: null,
-              })
-              console.log(`✅ Prestataire role created for user ${userId}`)
-            } else {
-              console.log(`ℹ️ Prestataire role already exists for user ${userId}`)
-            }
+            await Prestataire.create({
+              id: userId,
+              service_type: null,
+              rating: null,
+            })
+            console.log(`✅ Prestataire role created for user ${userId}`)
             break
 
           case 'commercant':
-            // Vérifier si le commercant existe déjà
-            const existingCommercant = await Commercant.find(userId)
-            if (!existingCommercant) {
-              await Commercant.create({
-                id: userId,
-                storeName: 'Nom du magasin à définir',
-                businessAddress: null,
-                contactNumber: null,
-                contractStartDate: DateTime.now(),
-                contractEndDate: DateTime.now().plus({ years: 1 }),
-                verificationState: 'verified',
-              })
-              console.log(`✅ Commercant role created for user ${userId}`)
-            } else {
-              console.log(`ℹ️ Commercant role already exists for user ${userId}`)
-            }
+            await Commercant.create({
+              id: userId,
+              storeName: 'Nom du magasin à définir',
+              businessAddress: null,
+              contactNumber: null,
+              contractStartDate: DateTime.now(),
+              contractEndDate: DateTime.now().plus({ years: 1 }),
+              verificationState: 'verified',
+            })
+            console.log(`✅ Commercant role created for user ${userId}`)
             break
 
           default:
@@ -321,8 +349,6 @@ export default class JustificationPiecesController {
         }
       } catch (roleError) {
         console.error(`❌ Error creating role for user ${userId}:`, roleError)
-        // On continue même si la création du rôle échoue
-        // L'admin peut créer manuellement le rôle plus tard
       }
 
       return response.ok({
