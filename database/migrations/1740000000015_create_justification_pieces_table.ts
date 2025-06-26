@@ -18,6 +18,9 @@ export default class extends BaseSchema {
       table.timestamp('uploaded_at')
       table.timestamp('verified_at').nullable()
 
+      table.timestamp('created_at')
+      table.timestamp('updated_at')
+
       table.foreign('utilisateur_id').references('id').inTable('utilisateurs').onDelete('CASCADE')
     })
   }

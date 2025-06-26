@@ -142,14 +142,35 @@ export default class MessagesController {
     // Récupérer tous les utilisateurs sauf l'utilisateur courant
     const users = await Utilisateurs.query()
       .whereNot('id', currentUserId)
+      .whereNot('state', 'closed') // Exclure les comptes fermés
       .select(['id', 'first_name', 'last_name'])
+      .preload('client')
+      .preload('livreur')
+      .preload('prestataire')
+      .preload('commercant')
+      .preload('admin')
 
-    // Formater les utilisateurs pour l'interface
-    const formattedUsers = users.map((user) => ({
-      id: user.id,
-      name: `${user.first_name || 'Utilisateur'} ${user.last_name || ''}`.trim(),
-    }))
+    // Formater les utilisateurs pour l'interface avec leurs rôles
+    const formattedUsers = users
+      .map((user) => {
+        // Déterminer le rôle principal de l'utilisateur
+        let role = null
+        if (user.client) role = 'client'
+        else if (user.livreur) role = 'deliveryman'
+        else if (user.prestataire) role = 'service_provider'
+        else if (user.commercant) role = 'shopkeeper'
+        else if (user.admin) role = 'admin'
 
-    return response.ok({ users: formattedUsers })
+        return {
+          id: user.id,
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          role: role,
+          avatar: null, // TODO: Ajouter support avatar si nécessaire
+        }
+      })
+      .filter((user) => user.role !== null) // Filtrer les utilisateurs sans rôle
+
+    return response.ok({ data: formattedUsers })
   }
 }

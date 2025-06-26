@@ -17,16 +17,22 @@ export default class JustificationPiece extends BaseModel {
   declare file_path: string
 
   @column()
-  declare account_type: string // Add account_type field
+  declare account_type: string
 
   @column()
-  declare verification_status: string
+  declare verification_status: 'pending' | 'verified' | 'rejected'
 
-  @column.dateTime({ autoCreate: true })
-  declare uploaded_at: DateTime
+  @column.dateTime()
+  declare uploaded_at: DateTime | null
 
   @column.dateTime()
   declare verified_at: DateTime | null
+
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
 
   @belongsTo(() => Utilisateurs, {
     foreignKey: 'utilisateur_id',

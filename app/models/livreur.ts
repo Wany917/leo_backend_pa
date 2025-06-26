@@ -14,15 +14,6 @@ export default class Livreur extends BaseModel {
   @column()
   declare rating: number | null
 
-  @column()
-  declare totalDeliveries: number
-
-  @column()
-  declare vehicleType: string
-
-  @column()
-  declare vehicleNumber: string
-
   @belongsTo(() => Utilisateurs, {
     foreignKey: 'id',
     localKey: 'id',

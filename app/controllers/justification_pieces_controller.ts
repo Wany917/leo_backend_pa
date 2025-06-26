@@ -2,8 +2,11 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import JustificationPiece from '#models/justification_piece'
 import Utilisateurs from '#models/utilisateurs'
+import Livreur from '#models/livreur'
+import Prestataire from '#models/prestataire'
+import Commercant from '#models/commercant'
 import app from '@adonisjs/core/services/app'
-import fs from 'fs/promises'
+import fs from 'node:fs/promises'
 import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class JustificationPiecesController {
@@ -19,9 +22,9 @@ export default class JustificationPiecesController {
       })
 
       if (!file) {
-        return response.badRequest({ 
-          status: 'error', 
-          message: 'No file provided' 
+        return response.badRequest({
+          status: 'error',
+          message: 'No file provided',
         })
       }
 
@@ -33,27 +36,27 @@ export default class JustificationPiecesController {
       if (!utilisateur_id || !document_type || !account_type) {
         return response.badRequest({
           status: 'error',
-          message: 'Missing required fields: utilisateur_id, document_type, account_type'
+          message: 'Missing required fields: utilisateur_id, document_type, account_type',
         })
       }
 
       const user = await Utilisateurs.findOrFail(utilisateur_id)
-      
+
       const dateStr = DateTime.now().toFormat('yyyyMMdd')
       const userName = `${user.first_name} ${user.last_name}`
       const extension = file.extname || '.pdf'
       const fileName = `${dateStr} - ${document_type === 'idCard' ? 'Id Card' : 'Drivers Licence'} - ${userName}.${extension}`
-      
+
       const uploadsDir = app.makePath('tmp/uploads/justifications')
       await fs.mkdir(uploadsDir, { recursive: true })
-      
+
       await file.move(uploadsDir, { name: fileName, overwrite: true })
-      
+
       if (!file.isValid) {
         return response.badRequest({
           status: 'error',
           message: 'File upload failed',
-          errors: file.errors
+          errors: file.errors,
         })
       }
 
@@ -62,20 +65,20 @@ export default class JustificationPiecesController {
         document_type,
         file_path: fileName,
         account_type,
-        verification_status: 'pending'
+        verification_status: 'pending',
       })
-      
+
       return response.created({
         status: 'success',
         message: 'Justification piece created successfully',
-        data: justificationPiece.serialize()
+        data: justificationPiece.serialize(),
       })
     } catch (error) {
       console.error('Error creating justification piece:', error)
-      return response.badRequest({ 
+      return response.badRequest({
         status: 'error',
-        message: 'Error creating justification piece', 
-        error: error.message 
+        message: 'Error creating justification piece',
+        error: error.message,
       })
     }
   }
@@ -84,13 +87,13 @@ export default class JustificationPiecesController {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
-      
+
       try {
         await fs.access(filePath)
       } catch {
         return response.notFound({
           status: 'error',
-          message: 'File not found on disk'
+          message: 'File not found on disk',
         })
       }
 
@@ -100,29 +103,32 @@ export default class JustificationPiecesController {
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
-        error: error.message
+        error: error.message,
       })
     }
   }
 
   async getAll({ response }: HttpContext) {
     try {
-      const justificationPieces = await JustificationPiece.query().preload('utilisateur' as unknown as ExtractModelRelations<JustificationPiece>, (userQuery: any) => {
-        userQuery.preload('admin')
-        userQuery.preload('client')
-        userQuery.preload('livreur')
-        userQuery.preload('prestataire')
-        userQuery.preload('commercant')
-      })
+      const justificationPieces = await JustificationPiece.query().preload(
+        'utilisateur' as unknown as ExtractModelRelations<JustificationPiece>,
+        (userQuery: any) => {
+          userQuery.preload('admin')
+          userQuery.preload('client')
+          userQuery.preload('livreur')
+          userQuery.preload('prestataire')
+          userQuery.preload('commercant')
+        }
+      )
       return response.ok({
         status: 'success',
         data: justificationPieces.map((piece) => piece.serialize()),
       })
     } catch (error) {
-      return response.badRequest({ 
+      return response.badRequest({
         status: 'error',
-        message: 'Error fetching justification pieces', 
-        error: error.message 
+        message: 'Error fetching justification pieces',
+        error: error.message,
       })
     }
   }
@@ -131,23 +137,26 @@ export default class JustificationPiecesController {
     try {
       const justificationPiece = await JustificationPiece.query()
         .where('id', request.param('id'))
-        .preload('utilisateur' as unknown as ExtractModelRelations<JustificationPiece>, (userQuery: any) => {
-          userQuery.preload('admin')
-          userQuery.preload('client')
-          userQuery.preload('livreur')
-          userQuery.preload('prestataire')
-          userQuery.preload('commercant')
-        })
+        .preload(
+          'utilisateur' as unknown as ExtractModelRelations<JustificationPiece>,
+          (userQuery: any) => {
+            userQuery.preload('admin')
+            userQuery.preload('client')
+            userQuery.preload('livreur')
+            userQuery.preload('prestataire')
+            userQuery.preload('commercant')
+          }
+        )
         .firstOrFail()
       return response.ok({
         status: 'success',
-        data: justificationPiece.serialize()
+        data: justificationPiece.serialize(),
       })
     } catch (error) {
-      return response.notFound({ 
+      return response.notFound({
         status: 'error',
-        message: 'Justification piece not found', 
-        error: error.message 
+        message: 'Justification piece not found',
+        error: error.message,
       })
     }
   }
@@ -156,22 +165,25 @@ export default class JustificationPiecesController {
     try {
       const justificationPieces = await JustificationPiece.query()
         .where('verification_status', 'pending')
-        .preload('utilisateur' as unknown as ExtractModelRelations<JustificationPiece>, (userQuery: any) => {
-          userQuery.preload('admin')
-          userQuery.preload('client')
-          userQuery.preload('livreur')
-          userQuery.preload('prestataire')
-          userQuery.preload('commercant')
-        })
+        .preload(
+          'utilisateur' as unknown as ExtractModelRelations<JustificationPiece>,
+          (userQuery: any) => {
+            userQuery.preload('admin')
+            userQuery.preload('client')
+            userQuery.preload('livreur')
+            userQuery.preload('prestataire')
+            userQuery.preload('commercant')
+          }
+        )
       return response.ok({
         status: 'success',
         data: justificationPieces.map((piece) => piece.serialize()),
       })
     } catch (error) {
-      return response.badRequest({ 
+      return response.badRequest({
         status: 'error',
-        message: 'Error fetching unverified justification pieces', 
-        error: error.message 
+        message: 'Error fetching unverified justification pieces',
+        error: error.message,
       })
     }
   }
@@ -180,47 +192,53 @@ export default class JustificationPiecesController {
     try {
       const justificationPieces = await JustificationPiece.query()
         .where('verification_status', 'verified')
-        .preload('utilisateur' as unknown as ExtractModelRelations<JustificationPiece>, (userQuery: any) => {
-          userQuery.preload('admin')
-          userQuery.preload('client')
-          userQuery.preload('livreur')
-          userQuery.preload('prestataire')
-          userQuery.preload('commercant')
-        })
+        .preload(
+          'utilisateur' as unknown as ExtractModelRelations<JustificationPiece>,
+          (userQuery: any) => {
+            userQuery.preload('admin')
+            userQuery.preload('client')
+            userQuery.preload('livreur')
+            userQuery.preload('prestataire')
+            userQuery.preload('commercant')
+          }
+        )
       return response.ok({
         status: 'success',
         data: justificationPieces.map((piece) => piece.serialize()),
       })
     } catch (error) {
-      return response.badRequest({ 
+      return response.badRequest({
         status: 'error',
-        message: 'Error fetching verified justification pieces', 
-        error: error.message 
+        message: 'Error fetching verified justification pieces',
+        error: error.message,
       })
     }
   }
 
   async getUserPieces({ request, response }: HttpContext) {
     try {
-      const userId = request.param('user_id')
+      const userId = request.param('utilisateur_id')
       const justificationPieces = await JustificationPiece.query()
         .where('utilisateur_id', userId)
-        .preload('utilisateur' as unknown as ExtractModelRelations<JustificationPiece>, (userQuery: any) => {
-          userQuery.preload('admin')
-          userQuery.preload('client')
-          userQuery.preload('livreur')
-          userQuery.preload('prestataire')
-          userQuery.preload('commercant')
-        })
+        .preload(
+          'utilisateur' as unknown as ExtractModelRelations<JustificationPiece>,
+          (userQuery: any) => {
+            userQuery.preload('admin')
+            userQuery.preload('client')
+            userQuery.preload('livreur')
+            userQuery.preload('prestataire')
+            userQuery.preload('commercant')
+          }
+        )
       return response.ok({
         status: 'success',
         data: justificationPieces.map((piece) => piece.serialize()),
       })
     } catch (error) {
-      return response.badRequest({ 
+      return response.badRequest({
         status: 'error',
-        message: 'Error fetching user justification pieces', 
-        error: error.message 
+        message: 'Error fetching user justification pieces',
+        error: error.message,
       })
     }
   }
@@ -228,20 +246,96 @@ export default class JustificationPiecesController {
   async verify({ request, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      const { comments } = request.only(['comments'])
+
       justificationPiece.verification_status = 'verified'
       justificationPiece.verified_at = DateTime.now()
+
+      // Ajouter les commentaires si fournis (nous devrons ajouter cette colonne à la DB ou utiliser un champ existant)
+      if (comments) {
+        // Pour l'instant, nous allons utiliser un champ existant ou en créer un nouveau
+        // justificationPiece.review_comments = comments
+      }
+
       await justificationPiece.save()
-      
+
+      // 🎯 NOUVEAU: Créer automatiquement le rôle correspondant
+      const userId = justificationPiece.utilisateur_id
+      const accountType = justificationPiece.account_type
+
+      console.log(`🎯 Creating role for user ${userId} with account type: ${accountType}`)
+
+      try {
+        switch (accountType) {
+          case 'livreur':
+            // Vérifier si le livreur existe déjà
+            const existingLivreur = await Livreur.find(userId)
+            if (!existingLivreur) {
+              await Livreur.create({
+                id: userId,
+                availabilityStatus: 'available',
+                rating: null,
+              })
+              console.log(`✅ Livreur role created for user ${userId}`)
+            } else {
+              console.log(`ℹ️ Livreur role already exists for user ${userId}`)
+            }
+            break
+
+          case 'prestataire':
+            // Vérifier si le prestataire existe déjà
+            const existingPrestataire = await Prestataire.find(userId)
+            if (!existingPrestataire) {
+              await Prestataire.create({
+                id: userId,
+                service_type: null,
+                rating: null,
+              })
+              console.log(`✅ Prestataire role created for user ${userId}`)
+            } else {
+              console.log(`ℹ️ Prestataire role already exists for user ${userId}`)
+            }
+            break
+
+          case 'commercant':
+            // Vérifier si le commercant existe déjà
+            const existingCommercant = await Commercant.find(userId)
+            if (!existingCommercant) {
+              await Commercant.create({
+                id: userId,
+                storeName: 'Nom du magasin à définir',
+                businessAddress: null,
+                contactNumber: null,
+                contractStartDate: DateTime.now(),
+                contractEndDate: DateTime.now().plus({ years: 1 }),
+                verificationState: 'verified',
+              })
+              console.log(`✅ Commercant role created for user ${userId}`)
+            } else {
+              console.log(`ℹ️ Commercant role already exists for user ${userId}`)
+            }
+            break
+
+          default:
+            console.log(`⚠️ Unknown account type: ${accountType}`)
+        }
+      } catch (roleError) {
+        console.error(`❌ Error creating role for user ${userId}:`, roleError)
+        // On continue même si la création du rôle échoue
+        // L'admin peut créer manuellement le rôle plus tard
+      }
+
       return response.ok({
         status: 'success',
-        message: 'Justification piece verified successfully',
-        data: justificationPiece.serialize()
+        message: 'Justification piece verified successfully and role created',
+        data: justificationPiece.serialize(),
       })
     } catch (error) {
-      return response.notFound({ 
+      console.error('Error verifying justification piece:', error)
+      return response.notFound({
         status: 'error',
-        message: 'Justification piece not found', 
-        error: error.message 
+        message: 'Justification piece not found',
+        error: error.message,
       })
     }
   }
@@ -249,20 +343,29 @@ export default class JustificationPiecesController {
   async reject({ request, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-      
+      const { comments } = request.only(['comments'])
+
       justificationPiece.verification_status = 'rejected'
+
+      // Ajouter les commentaires si fournis
+      if (comments) {
+        // Pour l'instant, nous allons utiliser un champ existant ou en créer un nouveau
+        // justificationPiece.review_comments = comments
+      }
+
       await justificationPiece.save()
-      
+
       return response.ok({
         status: 'success',
         message: 'Justification piece rejected successfully',
-        data: justificationPiece.serialize()
+        data: justificationPiece.serialize(),
       })
     } catch (error) {
-      return response.notFound({ 
+      console.error('Error rejecting justification piece:', error)
+      return response.notFound({
         status: 'error',
-        message: 'Justification piece not found', 
-        error: error.message 
+        message: 'Justification piece not found',
+        error: error.message,
       })
     }
   }
@@ -274,7 +377,7 @@ export default class JustificationPiecesController {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
-      
+
       // Delete file from disk
       try {
         await fs.unlink(filePath)
@@ -287,14 +390,43 @@ export default class JustificationPiecesController {
 
       return response.ok({
         status: 'success',
-        message: 'Justification piece deleted successfully'
+        message: 'Justification piece deleted successfully',
       })
     } catch (error) {
       console.error('Error deleting justification piece:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
-        error: error.message
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Download file by justification piece ID
+   */
+  async downloadById({ params, response }: HttpContext) {
+    try {
+      const justificationPiece = await JustificationPiece.findOrFail(params.id)
+      const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
+
+      // Check if file exists
+      try {
+        await fs.access(filePath)
+      } catch {
+        return response.notFound({
+          status: 'error',
+          message: 'File not found on disk',
+        })
+      }
+
+      return response.download(filePath)
+    } catch (error) {
+      console.error('Error downloading justification file by ID:', error)
+      return response.notFound({
+        status: 'error',
+        message: 'Justification piece not found',
+        error: error.message,
       })
     }
   }

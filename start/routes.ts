@@ -345,6 +345,7 @@ router
     router.get('user/:utilisateur_id', [JustificationPiecesController, 'getUserPieces'])
     router.put('verify/:id', [JustificationPiecesController, 'verify'])
     router.put('reject/:id', [JustificationPiecesController, 'reject'])
+    router.get(':id/download', [JustificationPiecesController, 'downloadById'])
     router.get(':id', [JustificationPiecesController, 'get'])
   })
   .prefix('justification-pieces')
