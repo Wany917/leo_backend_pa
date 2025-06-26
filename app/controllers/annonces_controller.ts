@@ -8,6 +8,21 @@ import app from '@adonisjs/core/services/app'
 import db from '@adonisjs/lucid/services/db'
 
 export default class AnnoncesController {
+  /**
+   * @tag Annonces - CRUD
+   * @summary Lister toutes les annonces
+   * @description Récupère toutes les annonces avec utilisateurs et relations
+   */
+  async getAllAnnonces({ request, response }: HttpContext) {
+    const annonces = await Annonce.query().preload('utilisateur' as ExtractModelRelations<Annonce>)
+    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
+  }
+
+  /**
+   * @tag Annonces - CRUD
+   * @summary Créer une nouvelle annonce
+   * @description Crée une annonce avec upload d'image optionnel
+   */
   async create({ request, response }: HttpContext) {
     try {
       // Récupérer le dernier ID de la table annonces
@@ -82,22 +97,11 @@ export default class AnnoncesController {
     }
   }
 
-  async getAllAnnonces({ request, response }: HttpContext) {
-    const annonces = await Annonce.query().preload('utilisateur' as ExtractModelRelations<Annonce>)
-    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
-  }
-
-  async getUserAnnonces({ request, response }: HttpContext) {
-    const userId = request.param('utilisateur_id')
-    const annonces = await Annonce.query()
-      .where('utilisateur_id', userId)
-      .preload('utilisateur' as ExtractModelRelations<Annonce>)
-      .preload('colis')
-      .preload('services')
-      .orderBy('created_at', 'desc')
-    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
-  }
-
+  /**
+   * @tag Annonces - CRUD
+   * @summary Récupérer une annonce par ID
+   * @description Affiche les détails d'une annonce spécifique
+   */
   async getAnnonce({ request, response }: HttpContext) {
     const annonce = await Annonce.query()
       .where('id', request.param('id'))
@@ -109,6 +113,27 @@ export default class AnnoncesController {
     return response.ok({ annonce: annonce.serialize() })
   }
 
+  /**
+   * @tag Annonces - CRUD
+   * @summary Récupérer les annonces d'un utilisateur
+   * @description Affiche toutes les annonces créées par un utilisateur spécifique
+   */
+  async getUserAnnonces({ request, response }: HttpContext) {
+    const userId = request.param('utilisateur_id')
+    const annonces = await Annonce.query()
+      .where('utilisateur_id', userId)
+      .preload('utilisateur' as ExtractModelRelations<Annonce>)
+      .preload('colis')
+      .preload('services')
+      .orderBy('created_at', 'desc')
+    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
+  }
+
+  /**
+   * @tag Annonces - CRUD
+   * @summary Mettre à jour une annonce
+   * @description Met à jour les détails d'une annonce existante
+   */
   async updateAnnonce({ request, response }: HttpContext) {
     const {
       title,

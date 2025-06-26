@@ -7,7 +7,12 @@ import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 export const userSockets = new Map<number, import('socket.io').Socket>()
 
 export default class MessagesController {
-  async send({ request, response }: HttpContext) {
+  /**
+   * @tag Messages - Communication
+   * @summary Envoyer un message
+   * @description Envoie un message entre utilisateurs avec WebSocket temps réel
+   */
+  async sendMessage({ request, response }: HttpContext) {
     const payload = await request.validateUsing(messageValidator)
     const { senderId, receiverId, content, tempId } = payload
 
@@ -73,18 +78,12 @@ export default class MessagesController {
     })
   }
 
-  async inbox({ response, auth }: HttpContext) {
-    const userId = auth.user!.id
-    const messages = await Message.query()
-      .where((query) => query.where('sender_id', userId).orWhere('receiver_id', userId))
-      .preload('sender' as unknown as ExtractModelRelations<Message>)
-      .preload('receiver' as unknown as ExtractModelRelations<Message>)
-      .orderBy('created_at', 'desc')
-
-    return response.ok({ messages: messages.map((m) => m.serialize()) })
-  }
-
-  async conversations({ response, auth }: HttpContext) {
+  /**
+   * @tag Messages - Communication
+   * @summary Récupérer les conversations
+   * @description Liste toutes les conversations de l'utilisateur
+   */
+  async getConversations({ auth, response }: HttpContext) {
     const userId = auth.user!.id
 
     const conversations = await Message.query()
@@ -129,13 +128,27 @@ export default class MessagesController {
     return response.ok({ conversations: result })
   }
 
-  async markRead({ response, request }: HttpContext) {
-    const message = await Message.findOrFail(request.param('id'))
-    message.isRead = true
-    await message.save()
-    return response.ok({ message: message.serialize() })
+  /**
+   * @tag Messages - Communication
+   * @summary Boîte de réception
+   * @description Messages reçus par l'utilisateur connecté
+   */
+  async getInbox({ auth, response }: HttpContext) {
+    const userId = auth.user!.id
+    const messages = await Message.query()
+      .where((query) => query.where('sender_id', userId).orWhere('receiver_id', userId))
+      .preload('sender' as unknown as ExtractModelRelations<Message>)
+      .preload('receiver' as unknown as ExtractModelRelations<Message>)
+      .orderBy('created_at', 'desc')
+
+    return response.ok({ messages: messages.map((m) => m.serialize()) })
   }
 
+  /**
+   * @tag Messages - Communication
+   * @summary Utilisateurs disponibles
+   * @description Liste des utilisateurs avec qui discuter
+   */
   async getAvailableUsers({ response, auth }: HttpContext) {
     const currentUserId = auth.user!.id
 
@@ -172,5 +185,49 @@ export default class MessagesController {
       .filter((user) => user.role !== null) // Filtrer les utilisateurs sans rôle
 
     return response.ok({ data: formattedUsers })
+  }
+
+  /**
+   * @tag Messages - Communication
+   * @summary Marquer comme lu
+   * @description Marque un message comme lu
+   */
+  async markAsRead({ request, response }: HttpContext) {
+    const message = await Message.findOrFail(request.param('id'))
+    message.isRead = true
+    await message.save()
+    return response.ok({ message: message.serialize() })
+  }
+
+  // =============================================================================
+  // MÉTHODES ALIAS POUR COMPATIBILITÉ AVEC LES ROUTES
+  // =============================================================================
+
+  /**
+   * Alias pour sendMessage - utilisé dans les routes comme 'send'
+   */
+  async send(ctx: HttpContext) {
+    return this.sendMessage(ctx)
+  }
+
+  /**
+   * Alias pour getConversations - utilisé dans les routes comme 'conversations'
+   */
+  async conversations(ctx: HttpContext) {
+    return this.getConversations(ctx)
+  }
+
+  /**
+   * Alias pour getInbox - utilisé dans les routes comme 'inbox'
+   */
+  async inbox(ctx: HttpContext) {
+    return this.getInbox(ctx)
+  }
+
+  /**
+   * Alias pour markAsRead - utilisé dans les routes comme 'markRead'
+   */
+  async markRead(ctx: HttpContext) {
+    return this.markAsRead(ctx)
   }
 }

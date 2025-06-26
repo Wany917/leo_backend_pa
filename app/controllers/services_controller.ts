@@ -8,7 +8,9 @@ import db from '@adonisjs/lucid/services/db'
 
 export default class ServicesController {
   /**
-   * Liste tous les services disponibles
+   * @tag Services - CRUD
+   * @summary Lister tous les services
+   * @description Récupère la liste de tous les services avec prestataires et types
    */
   async index({ response }: HttpContext) {
     try {
@@ -33,7 +35,9 @@ export default class ServicesController {
   }
 
   /**
-   * Crée un nouveau service
+   * @tag Services - CRUD
+   * @summary Créer un nouveau service
+   * @description Crée un service pour un prestataire avec validation
    */
   async create({ request, response }: HttpContext) {
     try {
@@ -317,7 +321,9 @@ export default class ServicesController {
   }
 
   /**
-   * Services géolocalisés à proximité
+   * @tag Services - Géolocalisation
+   * @summary Services géolocalisés à proximité
+   * @description Services à la personne géolocalisés conforme au cahier des charges page 2
    */
   async getNearbyServices({ request, response }: HttpContext) {
     try {
@@ -362,7 +368,9 @@ export default class ServicesController {
   }
 
   /**
-   * Carte des prestataires de services
+   * @tag Services - Géolocalisation
+   * @summary Carte interactive des prestataires
+   * @description Données cartographiques pour affichage des prestataires sur carte
    */
   async getServiceProvidersMap({ response }: HttpContext) {
     try {
@@ -400,7 +408,9 @@ export default class ServicesController {
   }
 
   /**
-   * Analytics des services pour l'admin - conforme au cahier des charges
+   * @tag Services - Analytics
+   * @summary Analytics des services (Top 5 prestations)
+   * @description Données analytics conformes au cahier des charges page 8 - Top 5 prestations les plus demandées
    */
   async getServiceAnalytics({ response }: HttpContext) {
     try {
@@ -485,7 +495,9 @@ export default class ServicesController {
   }
 
   /**
-   * Validation d'un service par l'admin
+   * @tag Services - Validation Admin
+   * @summary Validation d'un service par l'admin
+   * @description Workflow de validation des services par les administrateurs
    */
   async validateService({ request, response }: HttpContext) {
     try {

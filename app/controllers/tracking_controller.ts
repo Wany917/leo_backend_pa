@@ -5,7 +5,9 @@ import { DateTime } from 'luxon'
 
 export default class TrackingController {
   /**
-   * Récupérer l'historique des positions d'un livreur
+   * @tag Tracking - Positions
+   * @summary Positions d'un livreur
+   * @description Historique des positions GPS d'un livreur avec filtres date
    */
   async getLivreurPositions({ request, response }: HttpContext) {
     try {
@@ -51,7 +53,9 @@ export default class TrackingController {
   }
 
   /**
-   * Récupérer la dernière position d'un livreur
+   * @tag Tracking - Positions
+   * @summary Dernière position d'un livreur
+   * @description Position GPS la plus récente d'un livreur
    */
   async getLastPosition({ request, response }: HttpContext) {
     try {
@@ -80,7 +84,9 @@ export default class TrackingController {
   }
 
   /**
-   * Récupérer le tracking d'une livraison spécifique
+   * @tag Tracking - Livraisons
+   * @summary Suivi d'une livraison
+   * @description Données de tracking temps réel pour une livraison
    */
   async getLivraisonTracking({ request, response, auth }: HttpContext) {
     try {
@@ -136,7 +142,9 @@ export default class TrackingController {
   }
 
   /**
-   * Récupérer les positions actuelles de tous les livreurs actifs (admin)
+   * @tag Tracking - Map
+   * @summary Livreurs actifs
+   * @description Liste des livreurs actuellement en ligne
    */
   async getActiveLivreurs({ response, auth }: HttpContext) {
     try {

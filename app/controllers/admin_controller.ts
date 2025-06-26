@@ -15,6 +15,11 @@ import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 
 export default class AdminController {
+  /**
+   * @tag Admin - Gestion
+   * @summary Lister tous les administrateurs
+   * @description Récupère la liste complète des administrateurs avec leurs informations utilisateur
+   */
   async index({ response }: HttpContext) {
     try {
       const admins = await Admin.query().preload('user' as unknown as ExtractModelRelations<Admin>)
@@ -24,6 +29,11 @@ export default class AdminController {
     }
   }
 
+  /**
+   * @tag Admin - Gestion
+   * @summary Créer un nouvel administrateur
+   * @description Ajoute les privilèges admin à un utilisateur existant
+   */
   async create({ request, response }: HttpContext) {
     try {
       const { id, privileges } = await request.validateUsing(adminValidator)
@@ -53,6 +63,11 @@ export default class AdminController {
     }
   }
 
+  /**
+   * @tag Admin - Utilisateurs
+   * @summary Créer un utilisateur complet avec rôles
+   * @description Crée un nouvel utilisateur avec email et assigne les rôles sélectionnés
+   */
   async createUserWithEmail({ request, response }: HttpContext) {
     try {
       const {
@@ -225,22 +240,17 @@ export default class AdminController {
   async toggleUserStatus({ request, response }: HttpContext) {
     try {
       const userId = request.param('id')
-      const { state } = request.body()
-
-      // Validate state value
-      if (!state || !['open', 'closed'].includes(state)) {
-        return response
-          .status(400)
-          .send({ error_message: 'Invalid state. Must be "open" or "closed"' })
-      }
 
       // Find and update the user
       const user = await Utilisateurs.findOrFail(userId)
-      user.state = state
+
+      // Basculer automatiquement le statut
+      const newState = user.state === 'open' ? 'closed' : 'open'
+      user.state = newState
       await user.save()
 
       return response.ok({
-        message: 'User status updated successfully',
+        message: `User status updated successfully to ${newState}`,
         user: {
           id: user.id,
           state: user.state,
@@ -331,8 +341,9 @@ export default class AdminController {
   }
 
   /**
-   * Dashboard analytics des services pour l'admin
-   * Conforme au cahier des charges page 8 : "statistiques des prestations"
+   * @tag Admin - Services Dashboard
+   * @summary Dashboard analytics des services
+   * @description Stats générales, Top 5 prestations et analytics conformes au cahier des charges page 8
    */
   async getServicesDashboard({ response }: HttpContext) {
     try {
@@ -432,8 +443,9 @@ export default class AdminController {
   }
 
   /**
-   * Validation d'un prestataire par l'admin
-   * Conforme au cahier des charges page 6 : "validation de la sélection des prestataires"
+   * @tag Admin - Validation Prestataires
+   * @summary Validation d'un prestataire par l'admin
+   * @description Approuve/rejette un prestataire conforme au cahier des charges page 6
    */
   async validatePrestataire({ request, response }: HttpContext) {
     try {

@@ -3,11 +3,17 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // Utilisateurs de base avec tous les champs requis
+    // Vérifier si des utilisateurs existent déjà
+    const existingUsers = await Utilisateurs.query().limit(1)
+    if (existingUsers.length > 0) {
+      console.log('Des utilisateurs existent déjà, seeder ignoré')
+      return
+    }
+
+    // Utilisateurs de base avec tous les champs requis (sans IDs fixes)
     const users = [
       // Administrateurs
       {
-        id: 1,
         first_name: 'Sylvain',
         last_name: 'Levy',
         email: 'sylvain.levy@ecodeli.fr',
@@ -20,7 +26,6 @@ export default class extends BaseSeeder {
         state: 'open',
       },
       {
-        id: 2,
         first_name: 'Pierre',
         last_name: 'Chabrier',
         email: 'pierre.chabrier@ecodeli.fr',
@@ -34,7 +39,6 @@ export default class extends BaseSeeder {
       },
       // Clients
       {
-        id: 3,
         first_name: 'Marie',
         last_name: 'Dupont',
         email: 'marie.dupont@gmail.com',
@@ -47,7 +51,6 @@ export default class extends BaseSeeder {
         state: 'open',
       },
       {
-        id: 4,
         first_name: 'Jean',
         last_name: 'Martin',
         email: 'jean.martin@outlook.fr',
@@ -61,7 +64,6 @@ export default class extends BaseSeeder {
       },
       // Livreurs
       {
-        id: 5,
         first_name: 'Ahmed',
         last_name: 'Benali',
         email: 'ahmed.benali@gmail.com',
@@ -74,7 +76,6 @@ export default class extends BaseSeeder {
         state: 'open',
       },
       {
-        id: 6,
         first_name: 'Sophie',
         last_name: 'Rousseau',
         email: 'sophie.rousseau@laposte.net',
@@ -92,5 +93,7 @@ export default class extends BaseSeeder {
     for (const userData of users) {
       await Utilisateurs.create(userData)
     }
+
+    console.log('✅ Utilisateurs créés avec succès')
   }
 }

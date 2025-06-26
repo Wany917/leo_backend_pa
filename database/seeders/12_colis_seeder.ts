@@ -2,128 +2,54 @@ import { BaseSeeder } from '@adonisjs/lucid/seeders'
 
 export default class extends BaseSeeder {
   async run() {
+    // Vérifier si des colis existent déjà
+    const existingColis = await this.client.from('colis').select('*').limit(1)
+    if (existingColis.length > 0) {
+      console.log('Des colis existent déjà, seeder ignoré')
+      return
+    }
+
+    // Vérifier que les annonces existent
+    const annonces = await this.client.from('annonces').select('id').limit(10)
+    if (annonces.length === 0) {
+      console.log('❌ Aucune annonce trouvée, impossible de créer des colis')
+      return
+    }
+
     const colis = [
-      // Colis pour l'annonce 1 - Documents urgents
       {
-        id: 1,
-        annonce_id: 1,
-        tracking_number: 'ED-2025-PAR-LYO-001',
-        weight: 1.5,
-        length: 30,
-        width: 25,
-        height: 5,
-        content_description: 'Documents administratifs importants',
-        status: 'stored',
-        location_type: 'warehouse',
-        location_id: 1,
-        current_address: '110 rue de Flandre, 75019 Paris',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Colis pour l'annonce 2 - Épicerie fine
-      {
-        id: 2,
-        annonce_id: 2,
-        tracking_number: 'ED-2025-PAR-001-002',
-        weight: 4.2,
-        length: 40,
-        width: 30,
-        height: 25,
-        content_description: "Panier gourmand : confitures artisanales, huiles d'olive, miel",
-        status: 'in_transit',
-        location_type: 'in_transit',
-        location_id: null,
-        current_address: '55 rue des Abbesses, 75018 Paris',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Colis pour l'annonce 3 - Savons de Marseille
-      {
-        id: 3,
-        annonce_id: 3,
-        tracking_number: 'ED-2025-MAR-PAR-003',
-        weight: 5.0,
-        length: 50,
-        width: 40,
-        height: 20,
-        content_description: '20 savons de Marseille authentiques, emballage individuel',
-        status: 'stored',
-        location_type: 'warehouse',
-        location_id: 2,
-        current_address: 'Entrepôt Marseille',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Colis pour l'annonce 7 - Tableau ancien
-      {
-        id: 4,
-        annonce_id: 7,
-        tracking_number: 'ED-2025-PAR-LIL-004',
-        weight: 12.0,
-        length: 90,
-        width: 70,
-        height: 10,
-        content_description: 'Tableau ancien avec cadre, emballage professionnel',
-        status: 'stored',
-        location_type: 'warehouse',
-        location_id: 1,
-        current_address: '110 rue de Flandre, 75019 Paris',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Colis pour l'annonce 8 - Commande de viande
-      {
-        id: 5,
-        annonce_id: 8,
-        tracking_number: 'ED-2025-LYO-005',
-        weight: 8.0,
-        length: 45,
-        width: 35,
-        height: 20,
-        content_description: 'Colis réfrigéré : viande fraîche sous vide',
-        status: 'in_transit',
-        location_type: 'in_transit',
-        location_id: null,
-        current_address: 'En livraison vers Lyon 3ème',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Colis pour l'annonce 10 - Cadeau livré
-      {
-        id: 6,
-        annonce_id: 10,
-        tracking_number: 'ED-2025-PAR-MAR-006',
+        annonce_id: annonces[0]?.id,
+        tracking_number: 'ED2025001',
         weight: 2.5,
         length: 30,
         width: 20,
         height: 15,
-        content_description: "Cadeau d'anniversaire (livre et bijou)",
-        status: 'delivered',
-        location_type: 'client_address',
-        location_id: null,
-        current_address: '22 rue du Vieux-Port, 13001 Marseille',
-        created_at: new Date('2025-01-05'),
-        updated_at: new Date('2025-01-10'),
-      },
-      // Colis en attente de stockage
-      {
-        id: 7,
-        annonce_id: 3,
-        tracking_number: 'ED-2025-MAR-PAR-007',
-        weight: 5.0,
-        length: 50,
-        width: 40,
-        height: 20,
-        content_description: 'Second lot de savons pour commande groupée',
+        content_description: 'Produits artisanaux locaux',
         status: 'stored',
-        location_type: 'storage_box',
+        location_type: 'warehouse',
         location_id: 1,
-        current_address: 'Box de stockage Lyon',
+        current_address: 'Entrepôt EcoDeli Paris',
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        annonce_id: annonces[1]?.id,
+        tracking_number: 'ED2025002',
+        weight: 1.2,
+        length: 25,
+        width: 15,
+        height: 10,
+        content_description: 'Documents importants',
+        status: 'in_transit',
+        location_type: 'in_transit',
+        location_id: null,
+        current_address: 'En transit vers Lyon',
         created_at: new Date(),
         updated_at: new Date(),
       },
     ]
 
     await this.client.table('colis').insert(colis)
+    console.log('✅ Colis créés avec succès')
   }
 }
