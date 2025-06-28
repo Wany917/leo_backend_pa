@@ -3,10 +3,16 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // D'abord créer de nouveaux utilisateurs pour les prestataires
+    // Vérifier si des prestataires existent déjà
+    const existingPrestataires = await this.client.from('prestataires').select('*').limit(1)
+    if (existingPrestataires.length > 0) {
+      console.log('Des prestataires existent déjà, seeder ignoré')
+      return
+    }
+
+    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
     const prestataireUsers = [
       {
-        id: 7,
         first_name: 'Isabelle',
         last_name: 'Moreau',
         email: 'isabelle.moreau@gmail.com',
@@ -19,7 +25,6 @@ export default class extends BaseSeeder {
         state: 'open',
       },
       {
-        id: 8,
         first_name: 'Thomas',
         last_name: 'Petit',
         email: 'thomas.petit@services.fr',
@@ -33,22 +38,28 @@ export default class extends BaseSeeder {
       },
     ]
 
-    // ✅ Utiliser le modèle pour garantir le hachage des mots de passe
+    // Créer les utilisateurs et récupérer leurs IDs générés automatiquement
+    const createdUsers = []
     for (const userData of prestataireUsers) {
-      await Utilisateurs.create(userData)
+      const user = await Utilisateurs.create(userData)
+      createdUsers.push(user)
     }
 
-    // Créer les profils prestataires
+    console.log(
+      `✅ Utilisateurs prestataires créés avec IDs: ${createdUsers.map((u) => u.id).join(', ')}`
+    )
+
+    // Créer les profils prestataires avec les vrais IDs
     const prestataires = [
       {
-        id: 7, // Isabelle Moreau - Transport de personnes (Paris)
+        id: createdUsers[0].id, // Isabelle Moreau - ID automatique
         service_type: 'transport_personnes',
         rating: 4.9,
         created_at: new Date(),
         updated_at: new Date(),
       },
       {
-        id: 8, // Thomas Petit - Services ménagers (Lille)
+        id: createdUsers[1].id, // Thomas Petit - ID automatique
         service_type: 'services_menagers',
         rating: 4.7,
         created_at: new Date(),
@@ -58,17 +69,17 @@ export default class extends BaseSeeder {
 
     await this.client.table('prestataires').insert(prestataires)
 
-    // Créer aussi leurs profils clients
+    // Créer aussi leurs profils clients avec les vrais IDs
     const prestataireClients = [
       {
-        id: 7,
+        id: createdUsers[0].id,
         loyalty_points: 50,
         preferred_payment_method: 'bank_transfer',
         created_at: new Date(),
         updated_at: new Date(),
       },
       {
-        id: 8,
+        id: createdUsers[1].id,
         loyalty_points: 75,
         preferred_payment_method: 'credit_card',
         created_at: new Date(),
@@ -77,5 +88,6 @@ export default class extends BaseSeeder {
     ]
 
     await this.client.table('clients').insert(prestataireClients)
+    console.log('✅ Prestataires créés avec succès avec auto-incrémentation')
   }
 }

@@ -2,10 +2,41 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Livraison from '#models/livraison'
 import Annonce from '#models/annonce'
 import Client from '#models/client'
-import { livraisonValidator } from '#validators/create_livraison'
+import { livraisonValidator, updateLivraisonValidator } from '#validators/create_livraison'
 import db from '@adonisjs/lucid/services/db'
 
 export default class LivraisonsController {
+  // ========== Récupérer toutes les livraisons (admins seulement) ==========
+  async index({ request, response }: HttpContext) {
+    try {
+      const page = request.input('page', 1)
+      const limit = request.input('limit', 50)
+      const status = request.input('status')
+
+      let query = Livraison.query().preload('livreur').preload('client').preload('colis')
+
+      // Filtrage par statut si fourni
+      if (status) {
+        query = query.where('status', status)
+      }
+
+      const livraisons = await query.orderBy('created_at', 'desc').paginate(page, limit)
+
+      return response.ok({
+        livraisons: livraisons.serialize(),
+        total: livraisons.total,
+        page: livraisons.currentPage,
+        perPage: livraisons.perPage,
+      })
+    } catch (error) {
+      console.error('Error fetching all deliveries:', error)
+      return response.status(500).json({
+        error: 'Une erreur est survenue lors de la récupération des livraisons',
+        details: error.message,
+      })
+    }
+  }
+
   async create({ request, response, auth }: HttpContext) {
     const trx = await db.transaction()
 
@@ -25,6 +56,8 @@ export default class LivraisonsController {
           pickupLocation: data.pickup_location,
           dropoffLocation: data.dropoff_location,
           clientId: clientId,
+          annonceId: annonce.id,
+          price: annonce.price,
           status: 'scheduled',
         },
         { client: trx }
@@ -77,7 +110,7 @@ export default class LivraisonsController {
       return response.badRequest({ error: 'ID de livraison invalide' })
     }
 
-    const payload = await request.validateUsing(livraisonValidator)
+    const payload = await request.validateUsing(updateLivraisonValidator)
     const livraison = await Livraison.findOrFail(id)
 
     livraison.merge({
@@ -125,6 +158,54 @@ export default class LivraisonsController {
       console.error('Error fetching client deliveries:', error)
       return response.status(500).json({
         error: 'Une erreur est survenue lors de la récupération des livraisons',
+        details: error.message,
+      })
+    }
+  }
+
+  // ========== NOUVEAU: Récupérer les livraisons d'une annonce ==========
+  async getAnnounceLivraisons({ request, response }: HttpContext) {
+    try {
+      const annonceId = Number.parseInt(request.param('id'))
+      if (Number.isNaN(annonceId)) {
+        return response.badRequest({ error: 'ID annonce invalide' })
+      }
+
+      // Vérifier que l'annonce existe
+      const annonce = await Annonce.findOrFail(annonceId)
+
+      // Récupérer les livraisons via les colis de l'annonce
+      const livraisons = await db
+        .from('livraisons')
+        .join('livraison_colis', 'livraisons.id', '=', 'livraison_colis.livraison_id')
+        .join('colis', 'livraison_colis.colis_id', '=', 'colis.id')
+        .where('colis.annonce_id', annonceId)
+        .select('livraisons.*')
+        .distinct()
+        .orderBy('livraisons.created_at', 'desc')
+
+      // Enrichir avec les relations
+      const enrichedLivraisons = await Promise.all(
+        livraisons.map(async (livraison) => {
+          const fullLivraison = await Livraison.query()
+            .where('id', livraison.id)
+            .preload('livreur')
+            .preload('client')
+            .preload('colis')
+            .first()
+
+          return fullLivraison?.serialize()
+        })
+      )
+
+      return response.ok({
+        livraisons: enrichedLivraisons.filter(Boolean),
+        annonce: annonce.serialize(),
+      })
+    } catch (error) {
+      console.error('Error fetching announcement deliveries:', error)
+      return response.status(500).json({
+        error: "Une erreur est survenue lors de la récupération des livraisons de l'annonce",
         details: error.message,
       })
     }

@@ -18,7 +18,7 @@ export default class LivreursController {
 
       const livreur = await Livreur.create({
         id: utilisateurId,
-        availability_status: 'available',
+        availabilityStatus: 'available',
         rating: null,
       })
 
@@ -70,6 +70,12 @@ export default class LivreursController {
 
       let query = Livraison.query()
         .where('livreur_id', livreurId)
+        .preload('annonce', (annonceQuery) => {
+          annonceQuery.preload('utilisateur' as any)
+        })
+        .preload('client', (clientQuery) => {
+          clientQuery.preload('user' as any)
+        })
         .preload('colis', (colisQuery) => {
           colisQuery.preload('annonce', (annonceQuery) => {
             annonceQuery.preload('utilisateur' as any)
@@ -281,7 +287,7 @@ export default class LivreursController {
           inProgressLivraisons: Number(inProgressCount[0].$extras.total),
           cancelledLivraisons: Number(cancelledCount[0].$extras.total),
           rating: livreur.rating,
-          availabilityStatus: livreur.availability_status,
+          availabilityStatus: livreur.availabilityStatus,
           // totalRevenue: totalRevenue, // À implémenter selon votre logique
         },
       })
@@ -299,7 +305,7 @@ export default class LivreursController {
   async updateAvailability({ request, response }: HttpContext) {
     try {
       const livreurId = request.param('id')
-      const { availability_status: availabilityStatus } = request.body()
+      const { availabilityStatus } = request.body()
 
       const livreur = await Livreur.findOrFail(livreurId)
 
@@ -311,7 +317,7 @@ export default class LivreursController {
         })
       }
 
-      livreur.availability_status = availabilityStatus
+      livreur.availabilityStatus = availabilityStatus
       await livreur.save()
 
       return response.ok({

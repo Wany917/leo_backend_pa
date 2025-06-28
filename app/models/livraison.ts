@@ -4,6 +4,7 @@ import type { BelongsTo, ManyToMany, HasMany } from '@adonisjs/lucid/types/relat
 import Colis from '#models/colis'
 import Livreur from '#models/livreur'
 import Client from '#models/client'
+import Annonce from '#models/annonce'
 import HistoriqueLivraison from '#models/historique_livraison'
 import Ws from '#services/ws'
 
@@ -17,6 +18,9 @@ export default class Livraison extends BaseModel {
   @column({ columnName: 'client_id' })
   declare clientId: number | null
 
+  @column({ columnName: 'annonce_id' })
+  declare annonceId: number | null
+
   @column()
   declare pickupLocation: string
 
@@ -25,6 +29,12 @@ export default class Livraison extends BaseModel {
 
   @column()
   declare status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+
+  @column()
+  declare price: number | null
+
+  @column.dateTime()
+  declare deliveredAt: DateTime | null
 
   @belongsTo(() => Livreur, {
     foreignKey: 'livreurId',
@@ -37,6 +47,12 @@ export default class Livraison extends BaseModel {
     localKey: 'id',
   })
   declare client: BelongsTo<typeof Client>
+
+  @belongsTo(() => Annonce, {
+    foreignKey: 'annonceId',
+    localKey: 'id',
+  })
+  declare annonce: BelongsTo<typeof Annonce>
 
   @manyToMany(() => Colis, {
     pivotTable: 'livraison_colis',
@@ -68,7 +84,7 @@ export default class Livraison extends BaseModel {
     await this.load('colis' as any)
 
     // Notifier tous les livreurs disponibles
-    const availableLivreurs = await Livreur.query().where('availability_status', 'available')
+    const availableLivreurs = await Livreur.query().where('availabilityStatus', 'available')
 
     const notification = {
       livraison: {
@@ -76,6 +92,7 @@ export default class Livraison extends BaseModel {
         pickupLocation: this.pickupLocation,
         dropoffLocation: this.dropoffLocation,
         status: this.status,
+        price: this.price,
         createdAt: this.createdAt.toISO(),
         colisCount: this.colis?.length || 0,
       },

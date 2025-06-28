@@ -3,10 +3,16 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // D'abord créer de nouveaux utilisateurs pour les commercants
+    // Vérifier si des commercants existent déjà
+    const existingCommercants = await this.client.from('commercants').select('*').limit(1)
+    if (existingCommercants.length > 0) {
+      console.log('Des commercants existent déjà, seeder ignoré')
+      return
+    }
+
+    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
     const commercantUsers = [
       {
-        id: 9,
         first_name: 'François',
         last_name: 'Dubois',
         email: 'contact@epiceriefine-paris.fr',
@@ -19,7 +25,6 @@ export default class extends BaseSeeder {
         state: 'open',
       },
       {
-        id: 10,
         first_name: 'Nathalie',
         last_name: 'Sanchez',
         email: 'contact@savons-marseille.fr',
@@ -33,15 +38,21 @@ export default class extends BaseSeeder {
       },
     ]
 
-    // ✅ Utiliser le modèle pour garantir le hachage des mots de passe
+    // Créer les utilisateurs et récupérer leurs IDs générés automatiquement
+    const createdUsers = []
     for (const userData of commercantUsers) {
-      await Utilisateurs.create(userData)
+      const user = await Utilisateurs.create(userData)
+      createdUsers.push(user)
     }
 
-    // Créer les profils commercants
+    console.log(
+      `✅ Utilisateurs commercants créés avec IDs: ${createdUsers.map((u) => u.id).join(', ')}`
+    )
+
+    // Créer les profils commercants avec les vrais IDs
     const commercants = [
       {
-        id: 9, // François Dubois - Épicerie fine parisienne
+        id: createdUsers[0].id, // François Dubois - ID automatique
         store_name: 'Épicerie Fine Montmartre',
         business_address: '55 rue des Abbesses, 75018 Paris',
         verification_state: 'verified',
@@ -52,7 +63,7 @@ export default class extends BaseSeeder {
         updated_at: new Date(),
       },
       {
-        id: 10, // Nathalie Sanchez - Savonnerie artisanale
+        id: createdUsers[1].id, // Nathalie Sanchez - ID automatique
         store_name: 'Savons de Marseille Tradition',
         business_address: '12 cours Julien, 13006 Marseille',
         verification_state: 'pending',
@@ -66,17 +77,17 @@ export default class extends BaseSeeder {
 
     await this.client.table('commercants').insert(commercants)
 
-    // Créer aussi leurs profils clients
+    // Créer aussi leurs profils clients avec les vrais IDs
     const commercantClients = [
       {
-        id: 9,
+        id: createdUsers[0].id,
         loyalty_points: 300,
         preferred_payment_method: 'bank_transfer',
         created_at: new Date(),
         updated_at: new Date(),
       },
       {
-        id: 10,
+        id: createdUsers[1].id,
         loyalty_points: 250,
         preferred_payment_method: 'credit_card',
         created_at: new Date(),
@@ -85,5 +96,6 @@ export default class extends BaseSeeder {
     ]
 
     await this.client.table('clients').insert(commercantClients)
+    console.log('✅ Commercants créés avec succès avec auto-incrémentation')
   }
 }

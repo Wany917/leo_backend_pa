@@ -1,12 +1,41 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
+    // Vérifier si des services existent déjà
+    const existingServices = await this.client.from('services').select('*').limit(1)
+    if (existingServices.length > 0) {
+      console.log('Des services existent déjà, seeder ignoré')
+      return
+    }
+
+    // ✅ RÉCUPÉRER LES PRESTATAIRES PAR EMAIL PLUTÔT QUE PAR ID FIXE
+    const isabelle = await Utilisateurs.findBy('email', 'isabelle.moreau@gmail.com')
+    const thomas = await Utilisateurs.findBy('email', 'thomas.petit@services.fr')
+
+    if (!isabelle || !thomas) {
+      console.log('❌ Prestataires non trouvés, vérifiez les seeders précédents')
+      return
+    }
+
+    // Récupérer les IDs des prestataires depuis la table prestataires
+    const isabellePrestataire = await this.client
+      .from('prestataires')
+      .where('id', isabelle.id)
+      .first()
+    const thomasPrestataire = await this.client.from('prestataires').where('id', thomas.id).first()
+
+    if (!isabellePrestataire || !thomasPrestataire) {
+      console.log('❌ Profils prestataires non trouvés')
+      return
+    }
+
+    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
     const services = [
-      // Services d'Isabelle Moreau (ID 7) - Transport de personnes
+      // Services d'Isabelle Moreau - Transport de personnes
       {
-        id: 1,
-        prestataireId: 7,
+        prestataireId: isabellePrestataire.id, // ID dynamique
         service_type_id: 1, // Transport de personnes
         name: 'Transport médical Paris Intra-muros',
         description:
@@ -22,8 +51,7 @@ export default class extends BaseSeeder {
         updated_at: new Date(),
       },
       {
-        id: 2,
-        prestataireId: 7,
+        prestataireId: isabellePrestataire.id, // ID dynamique
         service_type_id: 1,
         name: 'Trajet aéroport Charles de Gaulle',
         description: 'Transport vers/depuis CDG avec assistance bagages',
@@ -38,10 +66,9 @@ export default class extends BaseSeeder {
         updated_at: new Date(),
       },
 
-      // Services de Thomas Petit (ID 8) - Services ménagers
+      // Services de Thomas Petit - Services ménagers
       {
-        id: 3,
-        prestataireId: 8,
+        prestataireId: thomasPrestataire.id, // ID dynamique
         service_type_id: 2, // Services ménagers
         name: 'Grand ménage appartement T2/T3',
         description:
@@ -57,8 +84,7 @@ export default class extends BaseSeeder {
         updated_at: new Date(),
       },
       {
-        id: 4,
-        prestataireId: 8,
+        prestataireId: thomasPrestataire.id, // ID dynamique
         service_type_id: 2,
         name: 'Ménage régulier hebdomadaire',
         description: 'Service de ménage hebdomadaire pour maintenance courante',
@@ -73,8 +99,7 @@ export default class extends BaseSeeder {
         updated_at: new Date(),
       },
       {
-        id: 5,
-        prestataireId: 8,
+        prestataireId: thomasPrestataire.id, // ID dynamique
         service_type_id: 2,
         name: 'Nettoyage après déménagement',
         description: 'Remise en état complète après déménagement - état des lieux',
@@ -91,8 +116,7 @@ export default class extends BaseSeeder {
 
       // Service complété pour test
       {
-        id: 6,
-        prestataireId: 7,
+        prestataireId: isabellePrestataire.id, // ID dynamique
         service_type_id: 1,
         name: 'Transport urgent hôpital',
         description: "Transport d'urgence pour examen médical",
@@ -109,5 +133,6 @@ export default class extends BaseSeeder {
     ]
 
     await this.client.table('services').insert(services)
+    console.log(`✅ ${services.length} services créés avec succès avec auto-incrémentation`)
   }
 }

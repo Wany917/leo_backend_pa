@@ -1,7 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import LivreurPosition from '#models/livreur_position'
 import Livraison from '#models/livraison'
+import {
+  updatePositionValidator,
+  searchDeliveryZoneValidator,
+} from '#validators/tracking_validators'
 import { DateTime } from 'luxon'
+import db from '@adonisjs/lucid/services/db'
 
 export default class TrackingController {
   /**
@@ -200,6 +205,128 @@ export default class TrackingController {
     } catch (error) {
       return response.badRequest({
         message: 'Erreur lors de la récupération des positions actives',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * @tag Tracking - Position
+   * @summary Mettre à jour position livreur
+   * @description Permet au livreur de mettre à jour sa position GPS
+   */
+  async updatePosition({ request, response, auth }: HttpContext) {
+    try {
+      const user = auth.user!
+      const {
+        latitude,
+        longitude,
+        accuracy,
+        speed,
+        heading,
+        livraison_id: livraisonId,
+      } = await request.validateUsing(updatePositionValidator)
+
+      // Vérifier que l'utilisateur est un livreur
+      const livreur = await user.related('livreur').query().first()
+      if (!livreur) {
+        return response.forbidden({
+          message: 'Seuls les livreurs peuvent mettre à jour leur position',
+        })
+      }
+
+      // Créer l'enregistrement de position
+      const position = await LivreurPosition.create({
+        livreurId: livreur.id,
+        livraisonId: livraisonId || null,
+        latitude,
+        longitude,
+        accuracy: accuracy || null,
+        speed: speed || null,
+        heading: heading || null,
+      })
+
+      return response.ok({
+        success: true,
+        position: position.serialize(),
+        timestamp: position.createdAt.toISO(),
+      })
+    } catch (error) {
+      return response.badRequest({
+        message: 'Erreur lors de la mise à jour de la position',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * @tag Tracking - Search
+   * @summary Rechercher livreurs par zone
+   * @description Trouve les livreurs disponibles dans un rayon donné
+   */
+  async searchNearbyDeliverers({ request, response }: HttpContext) {
+    try {
+      const {
+        lat,
+        lng,
+        radius,
+        service_type: serviceType,
+      } = await request.validateUsing(searchDeliveryZoneValidator)
+
+      // Requête SQL pour calculer la distance
+      const nearbyLivreurs = await LivreurPosition.query()
+        .select('*')
+        .select(
+          db.raw(
+            `
+            (6371 * acos(
+              cos(radians(?)) * cos(radians(latitude)) * 
+              cos(radians(longitude) - radians(?)) + 
+              sin(radians(?)) * sin(radians(latitude))
+            )) AS distance
+          `,
+            [lat, lng, lat]
+          )
+        )
+        .whereRaw(
+          '(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) <= ?',
+          [lat, lng, lat, radius]
+        )
+        .where('created_at', '>', DateTime.now().minus({ minutes: 30 }).toSQL())
+        .preload('livreur', (query) => {
+          query.where('availability_status', 'available')
+          query.preload('user' as any)
+        })
+        .orderBy('distance', 'asc')
+        .limit(20)
+
+      const availableLivreurs = nearbyLivreurs.filter(
+        (pos) => pos.livreur?.availabilityStatus === 'available'
+      )
+
+      return response.ok({
+        livreurs: availableLivreurs.map((pos) => ({
+          livreur: {
+            id: pos.livreur.id,
+            name: pos.livreur.user
+              ? `${pos.livreur.user.first_name} ${pos.livreur.user.last_name}`
+              : 'Inconnu',
+            rating: pos.livreur.rating || 0,
+          },
+          location: {
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            distance: Math.round((pos as any).$extras.distance * 100) / 100, // km avec 2 décimales
+          },
+          last_seen: pos.createdAt.toISO(),
+        })),
+        center: { lat, lng },
+        radius,
+        count: availableLivreurs.length,
+      })
+    } catch (error) {
+      return response.badRequest({
+        message: 'Erreur lors de la recherche de livreurs',
         error: error.message,
       })
     }

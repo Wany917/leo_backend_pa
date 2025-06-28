@@ -33,6 +33,8 @@ const JustificationPiecesController = () => import('#controllers/justification_p
 const TrackingController = () => import('#controllers/tracking_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 const FilesController = () => import('#controllers/files_controller')
+const PortefeuilleController = () => import('#controllers/portefeuille_controller')
+const StripeController = () => import('#controllers/stripe_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -58,13 +60,14 @@ router.get('/', async () => {
   }
 })
 
-router.post('send-email', [EmailController, 'sendEmail']).use(middleware.auth())
+router.post('send-email', [EmailController, 'sendEmail'])
 
 router
   .group(() => {
     router.post('generate-code', [CodeTemporaireController, 'generate_code'])
     router.post('check-code', [CodeTemporaireController, 'check_code'])
     router.post('reset-code', [CodeTemporaireController, 'reset_code'])
+    router.post('validate-delivery', [CodeTemporaireController, 'validateDelivery'])
   })
   .prefix('codes-temporaire')
 
@@ -115,25 +118,6 @@ router
       .use(middleware.auth())
     router.get(':id/stats', [LivreurController, 'getStats']).use(middleware.auth())
     router.put(':id/availability', [LivreurController, 'updateAvailability']).use(middleware.auth())
-
-    // Routes trajets planifiés pour Leaflet.js
-    router.get('planned-routes', [LivreurController, 'getPlannedRoutes']).use(middleware.auth())
-    router.post('planned-routes', [LivreurController, 'createPlannedRoute']).use(middleware.auth())
-    router
-      .put('planned-routes/:route_id', [LivreurController, 'updatePlannedRoute'])
-      .use(middleware.auth())
-    router
-      .delete('planned-routes/:route_id', [LivreurController, 'deletePlannedRoute'])
-      .use(middleware.auth())
-
-    // Recherche géographique dynamique
-    router
-      .get('routes/search', [LivreurController, 'searchCompatibleRoutes'])
-      .use(middleware.auth())
-    router
-      .get('routes/near/:lat/:lng/:radius', [LivreurController, 'getRoutesNearLocation'])
-      .use(middleware.auth())
-    router.get('geo/coverage-map', [LivreurController, 'getCoverageMap']).use(middleware.auth())
   })
   .prefix('livreurs')
 
@@ -163,6 +147,7 @@ router
     router.get('/', [AnnonceController, 'getAllAnnonces'])
     router.post('create', [AnnonceController, 'create'])
     router.post(':id/livraisons', [LivraisonController, 'create'])
+    router.get(':id/livraisons', [LivraisonController, 'getAnnounceLivraisons'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
     router.put(':id', [AnnonceController, 'updateAnnonce'])
@@ -170,17 +155,6 @@ router
     router.post(':id/services', [AnnonceServicesController, 'attachServices'])
     router.delete(':id/services', [AnnonceServicesController, 'detachServices'])
     router.get(':id/services', [AnnonceServicesController, 'getServices'])
-
-    // Routes géolocalisation dynamique pour Leaflet.js
-    router.get('search/geo', [AnnonceController, 'searchByGeoLocation'])
-    router.get('search/route', [AnnonceController, 'searchByRoute'])
-    router.get('search/corridor/:start_lat/:start_lng/:end_lat/:end_lng/:width_km', [
-      AnnonceController,
-      'searchInCorridor',
-    ])
-    router.get('suggestions/route-matches/:annonce_id', [AnnonceController, 'getRouteMatches'])
-    router.get('map/clusters/:zoom/:bounds', [AnnonceController, 'getMapClusters'])
-    router.get('map/heatmap', [AnnonceController, 'getHeatmapData'])
   })
   .prefix('annonces')
 
@@ -190,10 +164,6 @@ router
     router.get(':tracking_number', [ColisController, 'getColis'])
     router.get(':tracking_number/location-history', [ColisController, 'getLocationHistory'])
     router.post(':tracking_number/update-location', [ColisController, 'updateLocation'])
-
-    // Routes géolocalisation temps réel
-    router.get(':tracking_number/real-time-location', [ColisController, 'getRealTimeLocation'])
-    router.get('map/live-tracking', [ColisController, 'getLiveTrackingData']).use(middleware.auth())
   })
   .prefix('colis')
 
@@ -212,10 +182,6 @@ router
     router.put(':id', [WharehousesController, 'update'])
     router.delete(':id', [WharehousesController, 'delete'])
     router.get(':id/capacity', [WharehousesController, 'getAvailableCapacity'])
-
-    // Routes géolocalisation entrepôts
-    router.get('map/locations', [WharehousesController, 'getMapLocations'])
-    router.get('nearest/:lat/:lng', [WharehousesController, 'getNearestWarehouse'])
   })
   .prefix('wharehouses')
 
@@ -232,28 +198,10 @@ router
 
 router
   .group(() => {
+    router.get('/', [LivraisonController, 'index']).use([middleware.auth(), middleware.admin()])
     router.get(':id', [LivraisonController, 'show'])
     router.put(':id', [LivraisonController, 'update'])
     router.get('client/:client_id', [LivraisonController, 'getClientLivraisons'])
-
-    // Routes correspondances et optimisation
-    router.get('correspondances/suggest/:livraison_id', [
-      LivraisonController,
-      'suggestCorrespondances',
-    ])
-    router
-      .post('correspondances/create', [LivraisonController, 'createCorrespondance'])
-      .use(middleware.auth())
-    router.get('correspondances/hub/:city', [LivraisonController, 'getHubCorrespondances'])
-    router
-      .post('optimize/multi-leg', [LivraisonController, 'optimizeMultiLegDelivery'])
-      .use(middleware.auth())
-
-    // Routes map temps réel
-    router.get('map/active', [LivraisonController, 'getActiveLivraisonsMap']).use(middleware.auth())
-    router
-      .get('map/route-optimization/:livraison_id', [LivraisonController, 'getOptimizedRoute'])
-      .use(middleware.auth())
   })
   .prefix('livraisons')
 
@@ -292,7 +240,7 @@ router
     router.delete('delete-user/:id', [AdminController, 'deleteUser']).use(middleware.auth())
 
     // ==============================
-    // NOUVELLES ROUTES SERVICES ADMIN
+    // ROUTES SERVICES ADMIN - FONCTIONNELLES
     // ==============================
 
     // Dashboard et analytics services
@@ -328,23 +276,6 @@ router
     router
       .get('prestataires/:prestataireId/calendar', [ServicesController, 'getProviderCalendar'])
       .use(middleware.auth())
-
-    // Analytics géographiques et géolocalisation
-    router
-      .get('analytics/geo/heatmap', [AdminController, 'getDeliveryHeatmap'])
-      .use([middleware.auth(), middleware.admin()])
-    router
-      .get('analytics/geo/corridors', [AdminController, 'getPopularCorridors'])
-      .use([middleware.auth(), middleware.admin()])
-    router
-      .get('analytics/geo/coverage', [AdminController, 'getCoverageAnalytics'])
-      .use([middleware.auth(), middleware.admin()])
-    router
-      .get('analytics/network/bottlenecks', [AdminController, 'getNetworkBottlenecks'])
-      .use([middleware.auth(), middleware.admin()])
-    router
-      .get('analytics/realtime/dashboard', [AdminController, 'getRealtimeDashboard'])
-      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('admins')
 
@@ -355,10 +286,6 @@ router
     router.get(':id', [ServicesController, 'show'])
     router.put(':id', [ServicesController, 'update'])
     router.delete(':id', [ServicesController, 'delete'])
-
-    // Routes géolocalisation services
-    router.get('geo/nearby/:lat/:lng/:radius', [ServicesController, 'getNearbyServices'])
-    router.get('map/providers', [ServicesController, 'getServiceProvidersMap'])
   })
   .prefix('services')
 
@@ -402,37 +329,11 @@ router
       .get('active-livreurs', [TrackingController, 'getActiveLivreurs'])
       .use([middleware.auth(), middleware.admin()])
 
-    // Routes temps réel avancées pour Leaflet.js
+    // Nouvelles routes pour compléter la géolocalisation
+    router.post('update-position', [TrackingController, 'updatePosition']).use(middleware.auth())
     router
-      .get('real-time/eta/:livraison_id', [TrackingController, 'calculateETA'])
+      .get('nearby-deliverers', [TrackingController, 'searchNearbyDeliverers'])
       .use(middleware.auth())
-    router
-      .get('real-time/traffic/:route_id', [TrackingController, 'getTrafficConditions'])
-      .use(middleware.auth())
-    router
-      .post('real-time/detour-alert', [TrackingController, 'reportDetour'])
-      .use(middleware.auth())
-    router
-      .get('predictions/delivery-time/:livraison_id', [TrackingController, 'predictDeliveryTime'])
-      .use(middleware.auth())
-    router
-      .get('predictions/optimal-route/:start_lat/:start_lng/:end_lat/:end_lng', [
-        TrackingController,
-        'predictOptimalRoute',
-      ])
-      .use(middleware.auth())
-
-    // Map data pour Leaflet.js
-    router
-      .get('map/live-positions', [TrackingController, 'getLivePositionsMap'])
-      .use(middleware.auth())
-    router
-      .get('map/routes/active', [TrackingController, 'getActiveRoutesMap'])
-      .use(middleware.auth())
-    router.get('map/geofences', [TrackingController, 'getGeofences']).use(middleware.auth())
-    router
-      .post('map/geofences', [TrackingController, 'createGeofence'])
-      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('tracking')
 
@@ -532,5 +433,61 @@ router
     })
   })
   .prefix('map')
+
+// ===============================================
+// ROUTES PORTEFEUILLE ECODELI
+// ===============================================
+router
+  .group(() => {
+    // Routes utilisateur (authentifié)
+    router.get('user/:userId', [PortefeuilleController, 'show']).use(middleware.auth())
+    router
+      .post('user/:userId/configure-virement', [PortefeuilleController, 'configureVirementAuto'])
+      .use(middleware.auth())
+    router
+      .post('user/:userId/desactiver-virement', [PortefeuilleController, 'desactiverVirementAuto'])
+      .use(middleware.auth())
+    router
+      .get('user/:userId/historique', [PortefeuilleController, 'historique'])
+      .use(middleware.auth())
+    router
+      .post('user/:userId/demander-virement', [PortefeuilleController, 'demanderVirement'])
+      .use(middleware.auth())
+
+    // Routes admin
+    router
+      .get('statistiques', [PortefeuilleController, 'statistiques'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('portefeuille')
+
+// ===============================================
+// ROUTES STRIPE - PAIEMENTS & ABONNEMENTS
+// ===============================================
+router
+  .group(() => {
+    // Webhooks (sans authentification - requis par Stripe)
+    router.post('webhook', [StripeController, 'webhook'])
+
+    // Informations publiques (sans authentification)
+    router.get('commission-info', [StripeController, 'getCommissionInfo'])
+
+    // Gestion des abonnements (authentifié)
+    router
+      .post('checkout/subscription', [StripeController, 'createSubscriptionCheckout'])
+      .use(middleware.auth())
+    router.get('checkout/success', [StripeController, 'handleCheckoutSuccess'])
+    router.get('customer-portal', [StripeController, 'createCustomerPortal']).use(middleware.auth())
+
+    // Gestion des paiements (authentifié)
+    router
+      .post('payments/delivery', [StripeController, 'createDeliveryPayment'])
+      .use(middleware.auth())
+    router
+      .post('payments/service', [StripeController, 'createServicePayment'])
+      .use(middleware.auth())
+    router.post('payments/capture', [StripeController, 'capturePayment']).use(middleware.auth())
+  })
+  .prefix('stripe')
 
 router.get('documents/:filename', [FilesController, 'downloadJustification'])

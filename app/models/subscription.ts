@@ -25,6 +25,18 @@ export default class Subscription extends BaseModel {
   @column()
   declare status: 'active' | 'expired' | 'cancelled'
 
+  @column()
+  declare stripeSubscriptionId: string | null
+
+  @column()
+  declare stripeCustomerId: string | null
+
+  @column()
+  declare stripePriceId: string | null
+
+  @column()
+  declare stripeMetadata: object | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -39,7 +51,7 @@ export default class Subscription extends BaseModel {
   static getSubscriptionPrices() {
     return {
       free: 0.0,
-      starter: 9.90,
+      starter: 9.9,
       premium: 19.99,
     }
   }
@@ -57,7 +69,7 @@ export default class Subscription extends BaseModel {
         priority_support: false,
       },
       premium: {
-        max_packages_per_month: -1, 
+        max_packages_per_month: -1,
         insurance_coverage: 500,
         priority_support: true,
       },

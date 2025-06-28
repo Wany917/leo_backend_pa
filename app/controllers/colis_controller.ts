@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Colis from '#models/colis'
 import Annonce from '#models/annonce'
+import Livreur from '#models/livreur'
 import ColisLocationHistory from '#models/colis_location_history'
 import { colisValidator } from '#validators/create_coli'
 import { DateTime } from 'luxon'
@@ -101,7 +102,9 @@ export default class ColisController {
   async getColis({ request, response }: HttpContext) {
     const colis = await Colis.query()
       .where('tracking_number', request.param('tracking_number'))
-      .preload('annonce')
+      .preload('annonce', (annonceQuery) => {
+        annonceQuery.preload('utilisateur' as ExtractModelRelations<Annonce>)
+      })
       .preload('livraisons')
       .preload('stockage')
       .firstOrFail()

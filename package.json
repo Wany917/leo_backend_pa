@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node bin/server.js",
     "build": "node ace build",
-    "dev": "node ace serve --hmr",
+    "dev": "node ace serve --watch",
     "test": "node ace test",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -68,6 +68,7 @@
     "reflect-metadata": "^0.2.2",
     "resend": "^4.4.0",
     "socket.io": "^4.8.1",
+    "stripe": "^18.2.1",
     "ws": "^8.18.1"
   },
   "hotHook": {

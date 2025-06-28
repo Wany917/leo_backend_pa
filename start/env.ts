@@ -38,5 +38,19 @@ export default await Env.create(new URL('../', import.meta.url), {
   S3_ACCESS_KEY_ID: Env.schema.string(),
   S3_SECRET_ACCESS_KEY: Env.schema.string(),
   S3_REGION: Env.schema.string(),
-  S3_BUCKET: Env.schema.string()
+  S3_BUCKET: Env.schema.string(),
+
+  /*
+  |----------------------------------------------------------
+  | Variables for configuring Stripe integration
+  |----------------------------------------------------------
+  */
+  STRIPE_SECRET_KEY: Env.schema.string(),
+  STRIPE_PUBLISHABLE_KEY: Env.schema.string(),
+  STRIPE_WEBHOOK_SECRET: Env.schema.string(),
+  STRIPE_PRICE_STARTER_MONTHLY: Env.schema.string.optional(),
+  STRIPE_PRICE_PREMIUM_MONTHLY: Env.schema.string.optional(),
+  FRONTEND_URL: Env.schema.string.optional(),
+  COMMISSION_LIVRAISON: Env.schema.number.optional(),
+  COMMISSION_SERVICE: Env.schema.number.optional(),
 })

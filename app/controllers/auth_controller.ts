@@ -4,6 +4,7 @@ import { registerValidator } from '#validators/register'
 import Utilisateurs from '#models/utilisateurs'
 import Subscription from '#models/subscription'
 import AccessToken from '#models/access_token'
+import StripeService from '#services/stripe_service'
 import { DateTime } from 'luxon'
 
 export default class AuthController {
@@ -110,12 +111,8 @@ export default class AuthController {
       console.log('🔍 DEBUG REGISTER - Password hash exists:', !!user.password)
       console.log('🔍 DEBUG REGISTER - Password hash length:', user.password?.length || 0)
 
-      await Subscription.create({
-        utilisateur_id: user.id,
-        subscription_type: 'free',
-        status: 'active',
-        start_date: DateTime.now(),
-      })
+      // Créer un abonnement FREE par défaut (sans Stripe)
+      await StripeService.createFreeSubscription(user.id)
 
       const token = await Utilisateurs.accessTokens.create(user)
 

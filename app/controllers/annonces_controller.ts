@@ -126,7 +126,41 @@ export default class AnnoncesController {
       .preload('colis')
       .preload('services')
       .orderBy('created_at', 'desc')
-    return response.ok({ annonces: annonces.map((annonce) => annonce.serialize()) })
+
+    // Charger aussi les livraisons associées à chaque annonce avec leurs colis
+    const annoncesWithLivraisons = await Promise.all(
+      annonces.map(async (annonce) => {
+        // Récupérer les livraisons de cette annonce
+        const livraisons = await db
+          .from('livraisons')
+          .where('annonce_id', annonce.id)
+          .orderBy('created_at', 'desc')
+
+        // Pour chaque livraison, récupérer ses colis
+        const livraisonsWithColis = await Promise.all(
+          livraisons.map(async (livraison) => {
+            const colis = await db
+              .from('colis')
+              .join('livraison_colis', 'colis.id', '=', 'livraison_colis.colis_id')
+              .where('livraison_colis.livraison_id', livraison.id)
+              .select('colis.*')
+
+            return {
+              ...livraison,
+              colis,
+            }
+          })
+        )
+
+        const serialized = annonce.serialize()
+        return {
+          ...serialized,
+          livraisons: livraisonsWithColis,
+        }
+      })
+    )
+
+    return response.ok({ annonces: annoncesWithLivraisons })
   }
 
   /**

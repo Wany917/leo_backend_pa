@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
-import { BaseModel, column, hasMany, hasOne } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, hasOne, beforeSave } from '@adonisjs/lucid/orm'
 import type { HasMany, HasOne } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
@@ -52,6 +52,9 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
 
   @column({ serializeAs: null })
   declare password: string
+
+  @column()
+  declare stripeCustomerId: string | null
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
