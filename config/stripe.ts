@@ -63,7 +63,7 @@ export const COMMISSION_RATES = {
 
 // URLs de redirection
 export const REDIRECT_URLS = {
-  SUCCESS: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/stripe/success`,
+  SUCCESS: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/stripe/succes`,
   CANCEL: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/stripe/cancelled`,
-  CUSTOMER_PORTAL: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/billing`,
+  CUSTOMER_PORTAL: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/app_client/wallet`,
 } as const

@@ -48,22 +48,44 @@ export default class PortefeuilleEcodeli extends BaseModel {
   // Computed Properties
   @computed()
   get soldeTotal() {
-    return this.soldeDisponible + this.soldeEnAttente
+    const disponible = Number.parseFloat(String(this.soldeDisponible)) || 0
+    const enAttente = Number.parseFloat(String(this.soldeEnAttente)) || 0
+    return disponible + enAttente
   }
 
   // Méthodes métier
   public async ajouterFondsEnAttente(montant: number): Promise<void> {
-    this.soldeEnAttente += montant
+    const currentSoldeEnAttente = Number.parseFloat(String(this.soldeEnAttente)) || 0
+    const montantToAdd = Number.parseFloat(String(montant)) || 0
+    this.soldeEnAttente = currentSoldeEnAttente + montantToAdd
+
+    console.log(
+      `💰 ajouterFondsEnAttente: ${currentSoldeEnAttente} + ${montantToAdd} = ${this.soldeEnAttente}`
+    )
     await this.save()
   }
 
   public async libererFonds(montant: number): Promise<void> {
-    if (this.soldeEnAttente < montant) {
-      throw new Error('Solde en attente insuffisant')
+    const currentSoldeEnAttente = Number.parseFloat(String(this.soldeEnAttente)) || 0
+    const currentSoldeDisponible = Number.parseFloat(String(this.soldeDisponible)) || 0
+    const montantNumeric = Number.parseFloat(String(montant)) || 0
+
+    console.log(
+      `🔍 libererFonds: Solde en attente: ${currentSoldeEnAttente}, Montant à libérer: ${montantNumeric}`
+    )
+
+    if (currentSoldeEnAttente < montantNumeric) {
+      throw new Error(
+        `Solde en attente insuffisant (${currentSoldeEnAttente}€ < ${montantNumeric}€)`
+      )
     }
 
-    this.soldeEnAttente -= montant
-    this.soldeDisponible += montant
+    this.soldeEnAttente = currentSoldeEnAttente - montantNumeric
+    this.soldeDisponible = currentSoldeDisponible + montantNumeric
+
+    console.log(
+      `💰 libererFonds: Nouveau solde en attente: ${this.soldeEnAttente}, Nouveau solde disponible: ${this.soldeDisponible}`
+    )
     await this.save()
 
     // Vérifier si virement automatique nécessaire
@@ -74,11 +96,14 @@ export default class PortefeuilleEcodeli extends BaseModel {
   }
 
   public async retirerFonds(montant: number): Promise<void> {
-    if (this.soldeDisponible < montant) {
+    const currentSoldeDisponible = Number.parseFloat(String(this.soldeDisponible)) || 0
+    const montantNumeric = Number.parseFloat(String(montant)) || 0
+
+    if (currentSoldeDisponible < montantNumeric) {
       throw new Error('Solde disponible insuffisant')
     }
 
-    this.soldeDisponible -= montant
+    this.soldeDisponible = currentSoldeDisponible - montantNumeric
     await this.save()
   }
 

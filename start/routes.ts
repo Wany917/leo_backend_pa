@@ -474,10 +474,20 @@ router
 
     // Gestion des abonnements (authentifié)
     router
-      .post('checkout/subscription', [StripeController, 'createSubscriptionCheckout'])
+      .post('subscribe', [StripeController, 'createSubscriptionCheckout'])
       .use(middleware.auth())
     router.get('checkout/success', [StripeController, 'handleCheckoutSuccess'])
-    router.get('customer-portal', [StripeController, 'createCustomerPortal']).use(middleware.auth())
+    router
+      .get('session/:sessionId', [StripeController, 'getCheckoutSession'])
+      .use(middleware.auth())
+    router
+      .post('customer-portal', [StripeController, 'createCustomerPortal'])
+      .use(middleware.auth())
+
+    // Factures et téléchargements
+    router
+      .get('invoice/:invoiceId/download', [StripeController, 'downloadInvoice'])
+      .use(middleware.auth())
 
     // Gestion des paiements (authentifié)
     router
@@ -486,8 +496,19 @@ router
     router
       .post('payments/service', [StripeController, 'createServicePayment'])
       .use(middleware.auth())
+    router
+      .post('payments/livraison', [StripeController, 'createLivraisonPayment'])
+      .use(middleware.auth())
+      .use(middleware.auth())
     router.post('payments/capture', [StripeController, 'capturePayment']).use(middleware.auth())
   })
   .prefix('stripe')
 
 router.get('documents/:filename', [FilesController, 'downloadJustification'])
+
+// Route webhook alternative pour compatibilité avec Stripe Dashboard
+router
+  .group(() => {
+    router.post('stripe/webhook', [StripeController, 'webhook'])
+  })
+  .prefix('api')

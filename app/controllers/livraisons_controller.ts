@@ -126,39 +126,78 @@ export default class LivraisonsController {
   }
 
   // ========== Récupérer les livraisons d'un client ==========
-  async getClientLivraisons({ request, response }: HttpContext) {
+  async getClientLivraisons({ params, response }: HttpContext) {
     try {
-      const clientId = Number.parseInt(request.param('client_id'))
-      if (Number.isNaN(clientId)) {
-        return response.badRequest({ error: 'ID client invalide' })
-      }
+      const clientId = params.client_id
+      console.log('🔍 getClientLivraisons called with clientId:', clientId)
+      console.log('🔍 clientId type:', typeof clientId)
 
-      const page = request.input('page', 1)
-      const limit = request.input('limit', 20)
-      const status = request.input('status')
-
-      let query = Livraison.query()
+      const livraisons = await Livraison.query()
         .where('client_id', clientId)
         .preload('livreur')
-        .preload('colis', (colisQuery) => {
-          colisQuery.preload('annonce')
+        .preload('client')
+        .preload('colis', (coliQuery) => {
+          coliQuery.preload('annonce')
+        })
+        .orderBy('created_at', 'desc')
+
+      console.log('🔍 Query result count:', livraisons.length)
+      console.log(
+        '🔍 Found livraisons:',
+        livraisons.map((l) => ({
+          id: l.id,
+          clientId: l.clientId,
+          client_id: l.clientId,
+          status: l.status,
+        }))
+      )
+
+      // Vérifier s'il y a des livraisons en base avec d'autres client_id
+      const allLivraisons = await Livraison.query()
+        .select('id', 'client_id')
+        .orderBy('id', 'desc')
+        .limit(10)
+      console.log(
+        '🔍 All recent livraisons in DB (sample):',
+        allLivraisons.map((l) => ({ id: l.id, client_id: l.clientId }))
+      )
+
+      // 🚀 ENRICHIR LES LIVRAISONS AVEC LES DONNÉES DE PAIEMENT
+      const enrichedLivraisons = livraisons.map((livraison) => {
+        const serialized = livraison.serialize()
+
+        console.log('💰 Processing livraison payment data:', {
+          id: livraison.id,
+          paymentStatus: livraison.paymentStatus,
+          paymentIntentId: livraison.paymentIntentId,
+          amount: livraison.amount,
         })
 
-      // Filtrage par statut si fourni
-      if (status) {
-        query = query.where('status', status)
-      }
+        // Utiliser les champs de paiement du modèle
+        return {
+          ...serialized,
+          payment_status: livraison.paymentStatus || 'unpaid',
+          payment_intent_id: livraison.paymentIntentId || null,
+          amount: livraison.amount || null,
+        }
+      })
 
-      const livraisons = await query.orderBy('created_at', 'desc').paginate(page, limit)
+      console.log('✅ Enriched livraisons count:', enrichedLivraisons.length)
 
       return response.ok({
-        livraisons: livraisons.serialize(),
+        success: true,
+        livraisons: {
+          data: enrichedLivraisons,
+          meta: {
+            total: livraisons.length,
+          },
+        },
       })
     } catch (error) {
-      console.error('Error fetching client deliveries:', error)
-      return response.status(500).json({
-        error: 'Une erreur est survenue lors de la récupération des livraisons',
-        details: error.message,
+      console.error('Erreur lors de la récupération des livraisons du client:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la récupération des livraisons',
       })
     }
   }

@@ -1,14 +1,10 @@
-import { DateTime } from 'luxon'
-import stripe, { SUBSCRIPTION_PLANS, COMMISSION_RATES, REDIRECT_URLS } from '#config/stripe'
+import stripe, { SUBSCRIPTION_PLANS, REDIRECT_URLS } from '#config/stripe'
 import Utilisateurs from '#models/utilisateurs'
 import Subscription from '#models/subscription'
 import PortefeuilleEcodeli from '#models/portefeuille_ecodeli'
 import TransactionPortefeuille from '#models/transaction_portefeuille'
-import type Stripe from 'stripe'
-
-// Alias pour éviter les conflits avec notre modèle Subscription
-type StripeSubscription = Stripe.Subscription
-type StripeInvoice = Stripe.Invoice
+import { DateTime } from 'luxon'
+import Stripe from 'stripe'
 
 export default class StripeService {
   /**
@@ -16,57 +12,39 @@ export default class StripeService {
    */
 
   /**
-   * Crée ou récupère un client Stripe
+   * Récupère ou crée un client Stripe pour un utilisateur
    */
   static async getOrCreateStripeCustomer(utilisateur: Utilisateurs): Promise<string> {
-    // Vérifier si l'utilisateur a déjà un customer Stripe
-    let customerId = utilisateur.stripeCustomerId
-
-    if (!customerId) {
-      // Créer un nouveau client Stripe
-      const customer = await stripe.customers.create({
-        email: utilisateur.email,
-        name: `${utilisateur.first_name} ${utilisateur.last_name}`,
-        metadata: {
-          utilisateur_id: utilisateur.id.toString(),
-        },
-      })
-
-      customerId = customer.id
-
-      // Sauvegarder l'ID dans la base
-      await utilisateur.merge({ stripeCustomerId: customerId }).save()
+    // Si l'utilisateur a déjà un ID client Stripe
+    if (utilisateur.stripeCustomerId) {
+      try {
+        // Vérifier que le client existe toujours chez Stripe
+        await stripe.customers.retrieve(utilisateur.stripeCustomerId)
+        return utilisateur.stripeCustomerId
+      } catch (error) {
+        console.warn("Client Stripe introuvable, création d'un nouveau client")
+      }
     }
 
-    return customerId
+    // Créer un nouveau client Stripe
+    const customer = await stripe.customers.create({
+      email: utilisateur.email,
+      name: `${utilisateur.first_name} ${utilisateur.last_name}`,
+      metadata: {
+        utilisateur_id: utilisateur.id.toString(),
+      },
+    })
+
+    // Sauvegarder l'ID client
+    utilisateur.stripeCustomerId = customer.id
+    await utilisateur.save()
+
+    return customer.id
   }
 
   /**
    * 🎯 GESTION DES ABONNEMENTS
    */
-
-  /**
-   * Crée un abonnement FREE par défaut (sans Stripe)
-   */
-  static async createFreeSubscription(utilisateurId: number): Promise<void> {
-    // Vérifier s'il n'existe pas déjà un abonnement
-    const existingSubscription = await Subscription.findBy('utilisateur_id', utilisateurId)
-
-    if (!existingSubscription) {
-      await Subscription.create({
-        utilisateur_id: utilisateurId,
-        subscription_type: 'free',
-        monthly_price: 0,
-        status: 'active',
-        start_date: DateTime.now(),
-        end_date: null, // FREE = illimité dans le temps
-        stripeSubscriptionId: null, // Pas géré par Stripe
-        stripeCustomerId: null,
-        stripePriceId: null,
-        stripeMetadata: null,
-      })
-    }
-  }
 
   /**
    * Crée une session de checkout pour un abonnement
@@ -76,16 +54,16 @@ export default class StripeService {
     planType: 'starter' | 'premium'
   ): Promise<string> {
     const customerId = await this.getOrCreateStripeCustomer(utilisateur)
-    const plan = planType === 'starter' ? SUBSCRIPTION_PLANS.STARTER : SUBSCRIPTION_PLANS.PREMIUM
+    const plan = SUBSCRIPTION_PLANS[planType.toUpperCase() as keyof typeof SUBSCRIPTION_PLANS]
 
-    if (!plan.stripePriceId) {
-      throw new Error(`Plan ${planType} n'a pas de price ID Stripe configuré`)
+    if (!plan || !plan.stripePriceId) {
+      throw new Error(`Plan invalide ou non configuré: ${planType}`)
     }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: 'subscription',
       payment_method_types: ['card'],
+      mode: 'subscription',
       line_items: [
         {
           price: plan.stripePriceId,
@@ -104,65 +82,62 @@ export default class StripeService {
   }
 
   /**
-   * Gère la finalisation d'un abonnement après paiement
+   * Gère le succès d'un checkout d'abonnement
    */
   static async handleSubscriptionSuccess(sessionId: string): Promise<void> {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['subscription'],
+      expand: ['subscription', 'customer'],
     })
 
-    if (!session.metadata?.utilisateur_id) {
-      throw new Error('Utilisateur ID manquant dans les métadonnées')
+    if (!session.subscription || !session.metadata?.utilisateur_id) {
+      throw new Error('Session invalide ou métadonnées manquantes')
     }
 
     const utilisateurId = Number.parseInt(session.metadata.utilisateur_id)
     const planType = session.metadata.plan_type as 'starter' | 'premium'
+    const subscription = session.subscription as Stripe.Subscription
 
-    // Mettre à jour l'abonnement dans notre base
-    await this.updateUserSubscription(
-      utilisateurId,
-      planType,
-      session.subscription as StripeSubscription
-    )
-  }
-
-  /**
-   * Met à jour l'abonnement utilisateur
-   */
-  static async updateUserSubscription(
-    utilisateurId: number,
-    planType: 'starter' | 'premium',
-    stripeSubscription: StripeSubscription
-  ): Promise<void> {
-    const subscriptionType = planType === 'starter' ? 'starter' : 'premium'
-    const plan =
-      SUBSCRIPTION_PLANS[subscriptionType.toUpperCase() as keyof typeof SUBSCRIPTION_PLANS]
-
-    // Désactiver l'ancien abonnement
+    // Désactiver l'ancienne souscription si elle existe
     await Subscription.query()
       .where('utilisateur_id', utilisateurId)
       .where('status', 'active')
       .update({ status: 'cancelled' })
 
-    // Créer le nouvel abonnement avec DateTime
-    // Contournement temporaire des types Stripe
-    const subscription = stripeSubscription as any
+    // Créer la nouvelle souscription
+    const plan = SUBSCRIPTION_PLANS[planType.toUpperCase() as keyof typeof SUBSCRIPTION_PLANS]
     await Subscription.create({
       utilisateur_id: utilisateurId,
-      subscription_type: subscriptionType,
+      subscription_type: planType,
       monthly_price: plan.price,
-      status: 'active',
       start_date: DateTime.now(),
-      end_date: DateTime.fromSeconds(subscription.current_period_end),
+      end_date: null, // Gérée par Stripe
+      status: 'active',
       stripeSubscriptionId: subscription.id,
-      stripeCustomerId: subscription.customer as string,
-      stripePriceId: subscription.items.data[0]?.price?.id || null,
-      stripeMetadata: subscription.metadata || null,
+      stripeCustomerId: session.customer as string,
+      stripePriceId: plan.stripePriceId,
+      stripeMetadata: {
+        subscriptionItems: subscription.items.data,
+        currentPeriodEnd: (subscription as any).current_period_end,
+      } as any,
     })
   }
 
   /**
-   * Crée un portail client Stripe pour gérer les abonnements
+   * Crée un abonnement gratuit par défaut
+   */
+  static async createFreeSubscription(utilisateurId: number): Promise<Subscription> {
+    return await Subscription.create({
+      utilisateur_id: utilisateurId,
+      subscription_type: 'free',
+      monthly_price: 0,
+      start_date: DateTime.now(),
+      end_date: null,
+      status: 'active',
+    })
+  }
+
+  /**
+   * Crée une session de portail client
    */
   static async createCustomerPortalSession(utilisateur: Utilisateurs): Promise<string> {
     const customerId = await this.getOrCreateStripeCustomer(utilisateur)
@@ -176,7 +151,7 @@ export default class StripeService {
   }
 
   /**
-   * 🎯 GESTION DES PAIEMENTS DE LIVRAISONS/SERVICES
+   * 🎯 GESTION DES PAIEMENTS
    */
 
   /**
@@ -184,13 +159,13 @@ export default class StripeService {
    */
   static async createDeliveryPayment(
     utilisateur: Utilisateurs,
-    amount: number, // en centimes
+    amount: number,
     annonceId: number,
     description: string
   ): Promise<Stripe.PaymentIntent> {
     const customerId = await this.getOrCreateStripeCustomer(utilisateur)
 
-    return await stripe.paymentIntents.create({
+    const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'eur',
       customer: customerId,
@@ -200,9 +175,10 @@ export default class StripeService {
         utilisateur_id: utilisateur.id.toString(),
         annonce_id: annonceId.toString(),
       },
-      // Capturer manuellement après validation livraison
-      capture_method: 'manual',
+      capture_method: 'manual', // Capture manuelle après validation livraison
     })
+
+    return paymentIntent
   }
 
   /**
@@ -210,13 +186,13 @@ export default class StripeService {
    */
   static async createServicePayment(
     utilisateur: Utilisateurs,
-    amount: number, // en centimes
+    amount: number,
     serviceId: number,
     description: string
   ): Promise<Stripe.PaymentIntent> {
     const customerId = await this.getOrCreateStripeCustomer(utilisateur)
 
-    return await stripe.paymentIntents.create({
+    const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'eur',
       customer: customerId,
@@ -226,127 +202,155 @@ export default class StripeService {
         utilisateur_id: utilisateur.id.toString(),
         service_id: serviceId.toString(),
       },
-      capture_method: 'manual',
+      capture_method: 'manual', // Capture manuelle après validation service
     })
+
+    return paymentIntent
   }
 
   /**
-   * 🎯 LIBÉRATION DES FONDS (APRÈS VALIDATION)
-   */
-
-  /**
-   * Capture le paiement et distribue les fonds
+   * Capture et distribue un paiement
    */
   static async captureAndDistributePayment(
     paymentIntentId: string,
     livreurId?: number,
     prestataireId?: number
   ): Promise<void> {
-    // Récupérer le Payment Intent
     const paymentIntent = await stripe.paymentIntents.capture(paymentIntentId)
 
-    const type = paymentIntent.metadata?.type
-    const amount = paymentIntent.amount_received / 100 // Convertir en euros
-
-    let commission = 0
-    let recipientId = 0
-
-    if (type === 'delivery' && livreurId) {
-      commission = (amount * COMMISSION_RATES.LIVRAISON) / 100
-      recipientId = livreurId
-    } else if (type === 'service' && prestataireId) {
-      commission = (amount * COMMISSION_RATES.SERVICE) / 100
-      recipientId = prestataireId
+    if (paymentIntent.status !== 'succeeded') {
+      throw new Error('Échec de la capture du paiement')
     }
 
-    const recipientAmount = amount - commission
+    const amount = paymentIntent.amount / 100 // Convertir en euros
+    const metadata = paymentIntent.metadata
+    let commission = 0
+    let beneficiaireId: number | null = null
 
-    // Créditer le portefeuille du livreur/prestataire
-    await this.creditUserWallet(recipientId, recipientAmount, paymentIntentId, type || 'unknown')
+    // Déterminer la commission et le bénéficiaire
+    if (metadata.type === 'delivery' && livreurId) {
+      commission = amount * 0.05 // 5% pour les livraisons
+      beneficiaireId = livreurId
+    } else if (metadata.type === 'service' && prestataireId) {
+      commission = amount * 0.08 // 8% pour les services
+      beneficiaireId = prestataireId
+    }
 
-    // Enregistrer la commission EcoDeli
-    await this.recordEcoDeliCommission(commission, paymentIntentId, type || 'unknown')
-  }
+    if (!beneficiaireId) {
+      throw new Error('Bénéficiaire non spécifié')
+    }
 
-  /**
-   * Crédite le portefeuille utilisateur
-   */
-  static async creditUserWallet(
-    utilisateurId: number,
-    amount: number,
-    paymentIntentId: string,
-    type: string
-  ): Promise<void> {
-    // Récupérer ou créer le portefeuille
-    let portefeuille = await PortefeuilleEcodeli.findBy('utilisateurId', utilisateurId)
+    // Récupérer ou créer le portefeuille du bénéficiaire
+    let portefeuille = await PortefeuilleEcodeli.query()
+      .where('utilisateur_id', beneficiaireId)
+      .where('is_active', true)
+      .first()
 
     if (!portefeuille) {
       portefeuille = await PortefeuilleEcodeli.create({
-        utilisateurId: utilisateurId,
+        utilisateurId: beneficiaireId,
         soldeDisponible: 0,
         soldeEnAttente: 0,
-        virementAutoActif: false,
-        seuilVirementAuto: 50,
         isActive: true,
       })
     }
 
-    // Sauvegarder le solde avant pour la transaction
-    const soldeAvant = portefeuille.soldeDisponible
+    // Ajouter les fonds en attente (seront libérés après validation)
+    const montantNet = amount - commission
+    await portefeuille.ajouterFondsEnAttente(montantNet)
 
-    // Créditer le solde
-    portefeuille.soldeDisponible += amount
-    await portefeuille.save()
-
-    // Enregistrer la transaction avec metadata en string
-    const transaction = await TransactionPortefeuille.create({
+    // Enregistrer la transaction
+    await TransactionPortefeuille.create({
       portefeuilleId: portefeuille.id,
-      utilisateurId: utilisateurId,
+      utilisateurId: beneficiaireId,
       typeTransaction: 'credit',
-      montant: amount,
-      soldeAvant: soldeAvant,
-      soldeApres: portefeuille.soldeDisponible,
-      description: `Paiement ${type} - Stripe: ${paymentIntentId}`,
+      montant: montantNet,
+      soldeAvant: portefeuille.soldeDisponible,
+      soldeApres: portefeuille.soldeDisponible, // Pas encore disponible
+      description: `Paiement ${metadata.type} #${metadata.annonce_id || metadata.service_id}`,
       referenceExterne: paymentIntentId,
-      statut: 'completed',
-      metadata: null, // On va utiliser setMetadata
+      statut: 'pending',
+      metadata: JSON.stringify({
+        commission,
+        montantBrut: amount,
+        stripePaymentIntentId: paymentIntentId,
+      }),
     })
+  }
 
-    // Utiliser la méthode setMetadata pour l'objet JSON
-    transaction.setMetadata({
-      stripe_payment_intent_id: paymentIntentId,
-      type,
-      commission_rate: type === 'delivery' ? COMMISSION_RATES.LIVRAISON : COMMISSION_RATES.SERVICE,
-    })
-    await transaction.save()
+  /**
+   * 🔒 NOUVEAU: Capture et distribue un paiement après validation de livraison
+   * Méthode spécifique pour le système anti-arnaque avec code de validation
+   */
+  static async capturePaymentAfterDeliveryValidation(
+    paymentIntentId: string,
+    livraisonId: number
+  ): Promise<void> {
+    try {
+      // Récupérer le Payment Intent
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
-    // Vérifier virement automatique si configuré
-    if (
-      portefeuille.virementAutoActif &&
-      portefeuille.soldeDisponible >= portefeuille.seuilVirementAuto
-    ) {
-      console.log(
-        `💳 Virement automatique déclenché: ${portefeuille.soldeDisponible}€ pour utilisateur ${utilisateurId}`
-      )
-      // TODO: Implémenter le virement automatique réel
+      if (paymentIntent.status !== 'requires_capture') {
+        throw new Error(`Payment Intent ${paymentIntentId} n'est pas en attente de capture`)
+      }
+
+      // Capturer le paiement
+      const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId)
+
+      if (capturedPayment.status !== 'succeeded') {
+        throw new Error('Échec de la capture du paiement')
+      }
+
+      console.log(`✅ Paiement capturé avec succès: ${capturedPayment.id}`)
+
+      // Récupérer la livraison et le livreur
+      const livraisonModule = await import('#models/livraison')
+      const Livraison = livraisonModule.default
+      const livraison = await Livraison.query()
+        .where('id', livraisonId)
+        .preload('livreur')
+        .firstOrFail()
+
+      if (!livraison.livreur?.id) {
+        throw new Error('Livreur non trouvé pour la livraison')
+      }
+
+      // Le reste de la logique est gérée par CodeTemporaireController.libererFondsLivraison
+      // qui sera appelé après la validation du code
+
+      console.log(`💰 Paiement prêt pour distribution au livreur ${livraison.livreur.id}`)
+    } catch (error) {
+      console.error('❌ Erreur capture paiement après validation:', error)
+      throw error
     }
   }
 
   /**
-   * Enregistre la commission EcoDeli
+   * 🔍 Vérifie si un paiement est en attente de validation (escrow)
    */
-  static async recordEcoDeliCommission(
-    amount: number,
-    paymentIntentId: string,
-    type: string
-  ): Promise<void> {
-    // TODO: Créer un système de comptabilité EcoDeli
-    // Pour l'instant, on peut juste logger
-    console.log(`💰 Commission EcoDeli: ${amount}€ pour ${type} (${paymentIntentId})`)
+  static async checkPaymentEscrowStatus(paymentIntentId: string): Promise<{
+    isInEscrow: boolean
+    amount: number
+    status: string
+    metadata: any
+  }> {
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+
+      return {
+        isInEscrow: paymentIntent.status === 'requires_capture',
+        amount: paymentIntent.amount / 100, // Convertir en euros
+        status: paymentIntent.status,
+        metadata: paymentIntent.metadata,
+      }
+    } catch (error) {
+      console.error('❌ Erreur vérification escrow:', error)
+      throw error
+    }
   }
 
   /**
-   * 🎯 GESTION DES WEBHOOKS STRIPE
+   * 🎯 GESTION DES WEBHOOKS
    */
 
   /**
@@ -360,95 +364,94 @@ export default class StripeService {
       const event = stripe.webhooks.constructEvent(
         rawBody,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET!
+        process.env.STRIPE_WEBHOOK_SECRET || ''
       )
 
+      console.log(`📨 Webhook reçu: ${event.type}`)
+
       switch (event.type) {
-        case 'checkout.session.completed':
-          await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session)
-          break
-
-        case 'invoice.payment_succeeded':
-          await this.handleInvoicePaymentSucceeded(event.data.object as StripeInvoice)
-          break
-
+        case 'customer.subscription.created':
         case 'customer.subscription.updated':
-          await this.handleSubscriptionUpdated(event.data.object as StripeSubscription)
+          await this.handleSubscriptionUpdate(event.data.object as Stripe.Subscription)
           break
 
         case 'customer.subscription.deleted':
-          await this.handleSubscriptionCancelled(event.data.object as StripeSubscription)
+          await this.handleSubscriptionCancellation(event.data.object as Stripe.Subscription)
+          break
+
+        case 'payment_intent.succeeded':
+          // Géré par captureAndDistributePayment
+          break
+
+        case 'invoice.payment_succeeded':
+          await this.handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
           break
 
         default:
-          console.log(`🔔 Webhook non géré: ${event.type}`)
+          console.log(`⚠️ Webhook non géré: ${event.type}`)
       }
 
       return { success: true }
-    } catch (error) {
-      console.error('❌ Erreur webhook Stripe:', error)
+    } catch (error: any) {
+      console.error('❌ Erreur webhook:', error)
       return { success: false, error: error.message }
     }
   }
 
   /**
-   * Gère la complétion d'un checkout
+   * Met à jour une souscription suite à un webhook
    */
-  private static async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
-    if (session.mode === 'subscription' && session.subscription) {
-      await this.handleSubscriptionSuccess(session.id)
+  private static async handleSubscriptionUpdate(stripeSubscription: Stripe.Subscription) {
+    const subscription = await Subscription.query()
+      .where('stripe_subscription_id', stripeSubscription.id)
+      .first()
+
+    if (!subscription) {
+      console.warn(`Souscription introuvable: ${stripeSubscription.id}`)
+      return
     }
+
+    // Mettre à jour le statut
+    if (stripeSubscription.status === 'active') {
+      subscription.status = 'active'
+    } else if (['canceled', 'unpaid'].includes(stripeSubscription.status)) {
+      subscription.status = 'cancelled'
+    }
+
+    subscription.stripeMetadata = {
+      ...(subscription.stripeMetadata as any),
+      status: stripeSubscription.status,
+      currentPeriodEnd: (stripeSubscription as any).current_period_end,
+    }
+
+    await subscription.save()
+  }
+
+  /**
+   * Gère l'annulation d'une souscription
+   */
+  private static async handleSubscriptionCancellation(stripeSubscription: Stripe.Subscription) {
+    const subscription = await Subscription.query()
+      .where('stripe_subscription_id', stripeSubscription.id)
+      .first()
+
+    if (!subscription) {
+      return
+    }
+
+    subscription.status = 'cancelled'
+    subscription.end_date = DateTime.fromSeconds((stripeSubscription as any).current_period_end)
+    await subscription.save()
+
+    // Créer automatiquement un abonnement Free
+    await this.createFreeSubscription(subscription.utilisateur_id)
   }
 
   /**
    * Gère le paiement réussi d'une facture
    */
-  private static async handleInvoicePaymentSucceeded(invoice: StripeInvoice): Promise<void> {
-    // Contournement temporaire des types Stripe
-    const invoiceAny = invoice as any
-    if (invoiceAny.subscription) {
-      const subscription = await stripe.subscriptions.retrieve(invoiceAny.subscription as string)
-      console.log('Facture payée pour abonnement:', subscription.id)
-    }
-  }
-
-  /**
-   * Gère la mise à jour d'un abonnement
-   */
-  private static async handleSubscriptionUpdated(subscription: StripeSubscription): Promise<void> {
-    // Synchroniser avec notre base de données
-    const customerId = subscription.customer as string
-
-    // Trouver l'utilisateur via son customer ID
-    const utilisateur = await Utilisateurs.findBy('stripeCustomerId', customerId)
-
-    if (utilisateur) {
-      // Contournement temporaire des types Stripe
-      const subscriptionAny = subscription as any
-      await Subscription.query()
-        .where('utilisateur_id', utilisateur.id)
-        .update({
-          status: subscription.status === 'active' ? 'active' : 'cancelled',
-          end_date: DateTime.fromSeconds(subscriptionAny.current_period_end),
-        })
-    }
-  }
-
-  /**
-   * Gère l'annulation d'un abonnement
-   */
-  private static async handleSubscriptionCancelled(
-    subscription: StripeSubscription
-  ): Promise<void> {
-    const customerId = subscription.customer as string
-
-    // Trouver l'utilisateur via son customer ID
-    const utilisateur = await Utilisateurs.findBy('stripeCustomerId', customerId)
-
-    if (utilisateur) {
-      await Subscription.query()
-        .where('utilisateur_id', utilisateur.id)
-        .update({ status: 'cancelled' })
-    }
+  private static async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+    console.log(`💰 Facture payée: ${invoice.id} - ${invoice.amount_paid / 100}€`)
+    // Ici on pourrait enregistrer le paiement dans la table payments
   }
 }

@@ -36,6 +36,15 @@ export default class Livraison extends BaseModel {
   @column.dateTime()
   declare deliveredAt: DateTime | null
 
+  @column()
+  declare paymentStatus: 'unpaid' | 'pending' | 'paid'
+
+  @column()
+  declare paymentIntentId: string | null
+
+  @column()
+  declare amount: number | null
+
   @belongsTo(() => Livreur, {
     foreignKey: 'livreurId',
     localKey: 'id',

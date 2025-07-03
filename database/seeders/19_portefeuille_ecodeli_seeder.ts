@@ -1,83 +1,67 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
-import Utilisateurs from '#models/utilisateurs'
+import PortefeuilleEcodeli from '#models/portefeuille_ecodeli'
 
 export default class extends BaseSeeder {
   async run() {
     // Vérifier si des portefeuilles existent déjà
-    const existingPortefeuilles = await this.client
-      .from('portefeuille_ecodeli')
-      .select('*')
-      .limit(1)
+    const existingPortefeuilles = await PortefeuilleEcodeli.query().limit(1)
     if (existingPortefeuilles.length > 0) {
-      console.log('Des portefeuilles EcoDeli existent déjà, seeder ignoré')
+      console.log('Des portefeuilles existent déjà, seeder ignoré')
       return
     }
 
-    // ✅ RÉCUPÉRER TOUS LES UTILISATEURS POUR CRÉER LEURS PORTEFEUILLES
-    const users = await Utilisateurs.all()
+    // ✅ PORTEFEUILLES COHÉRENTS AVEC LES PAIEMENTS
+    const portefeuilles = [
+      // =================================================================
+      // PORTEFEUILLE AHMED BENALI (Livreur ID 5)
+      // Livraison 3: Médicaments (32€ en attente)
+      // =================================================================
+      {
+        utilisateurId: 5, // Ahmed Benali
+        soldeDisponible: 89.75, // Anciens paiements libérés
+        soldeEnAttente: 32.0, // Paiement des médicaments en attente de validation
+        iban: 'FR76 1234 5678 9012 3456 789A',
+        virementAutomatique: true,
+        seuilVirement: 100.0,
+        isActive: true,
+        dernierVirement: new Date('2025-01-25T09:00:00'),
+      },
 
-    if (users.length === 0) {
-      console.log('❌ Aucun utilisateur trouvé, impossible de créer des portefeuilles')
-      return
+      // =================================================================
+      // PORTEFEUILLE LUCAS DUBOIS (Livreur ID 6)
+      // Livraison 5: Validation code (21.50€ en attente)
+      // =================================================================
+      {
+        utilisateurId: 6, // Lucas Dubois
+        soldeDisponible: 156.25, // Anciens paiements libérés
+        soldeEnAttente: 21.5, // Paiement en attente de validation par code
+        iban: 'FR76 9876 5432 1098 7654 321B',
+        virementAutomatique: false,
+        seuilVirement: 150.0,
+        isActive: true,
+        dernierVirement: new Date('2025-01-20T14:30:00'),
+      },
+
+      // =================================================================
+      // PORTEFEUILLE FATIMA ALAOUI (Livreur ID 7)
+      // Pas de livraison en cours - Portefeuille vide pour tests
+      // =================================================================
+      {
+        utilisateurId: 7, // Fatima Alaoui
+        soldeDisponible: 45.0, // Quelques paiements précédents
+        soldeEnAttente: 0.0, // Aucun paiement en attente
+        iban: 'FR76 1111 2222 3333 4444 555C',
+        virementAutomatique: true,
+        seuilVirement: 50.0,
+        isActive: true,
+        dernierVirement: null, // Jamais fait de virement
+      },
+    ]
+
+    for (const portefeuilleData of portefeuilles) {
+      await PortefeuilleEcodeli.create(portefeuilleData)
     }
 
-    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
-    const portefeuilles = []
-
-    for (const user of users) {
-      // Créer un portefeuille pour chaque utilisateur
-      portefeuilles.push({
-        utilisateur_id: user.id,
-        solde_disponible: 0.0, // Portefeuille vide par défaut
-        solde_en_attente: 0.0, // Pas de fonds bloqués
-        iban: null, // Pas d'IBAN configuré par défaut
-        bic: null,
-        virement_auto_actif: false, // Virement automatique désactivé
-        seuil_virement_auto: 50.0, // Seuil par défaut à 50€
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    // Quelques utilisateurs avec des soldes de test
-    const marie = users.find((u) => u.email === 'marie.dupont@gmail.com')
-    const ahmed = users.find((u) => u.email === 'ahmed.benali@gmail.com')
-    const isabelle = users.find((u) => u.email === 'isabelle.moreau@gmail.com')
-
-    // Ajouter des soldes de test pour certains utilisateurs
-    if (marie) {
-      const mariePortefeuille = portefeuilles.find((p) => p.utilisateur_id === marie.id)
-      if (mariePortefeuille) {
-        mariePortefeuille.solde_disponible = 125.5
-        mariePortefeuille.iban = 'FR1420041010050500013M02606'
-        mariePortefeuille.bic = 'BNPAFRPP'
-        mariePortefeuille.virement_auto_actif = true
-      }
-    }
-
-    if (ahmed) {
-      const ahmedPortefeuille = portefeuilles.find((p) => p.utilisateur_id === ahmed.id)
-      if (ahmedPortefeuille) {
-        ahmedPortefeuille.solde_disponible = 89.75
-        ahmedPortefeuille.solde_en_attente = 45.0 // Livraison en cours
-      }
-    }
-
-    if (isabelle) {
-      const isabellePortefeuille = portefeuilles.find((p) => p.utilisateur_id === isabelle.id)
-      if (isabellePortefeuille) {
-        isabellePortefeuille.solde_disponible = 245.3
-        isabellePortefeuille.iban = 'FR1420041010050500013M02607'
-        isabellePortefeuille.bic = 'BNPAFRPP'
-        isabellePortefeuille.virement_auto_actif = true
-        isabellePortefeuille.seuil_virement_auto = 100.0
-      }
-    }
-
-    await this.client.table('portefeuille_ecodeli').insert(portefeuilles)
-    console.log(
-      `✅ ${portefeuilles.length} portefeuilles EcoDeli créés avec succès avec auto-incrémentation`
-    )
+    console.log('✅ 3 portefeuilles créés avec soldes cohérents aux paiements')
   }
 }

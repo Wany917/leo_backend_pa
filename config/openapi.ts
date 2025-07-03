@@ -2,7 +2,7 @@ import path from 'node:path'
 import url from 'node:url'
 
 export default {
-  path: path.dirname(url.fileURLToPath(import.meta.url)) + '/../',
+  path: path.dirname(url.fileURLToPath(import.meta.url)) + '/',
 
   title: 'EcoDeli API - Documentation Interactive',
   version: '1.0.0',

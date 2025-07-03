@@ -1,42 +1,38 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
-import Utilisateurs from '#models/utilisateurs'
+import Client from '#models/client'
 
 export default class extends BaseSeeder {
   async run() {
-    // Récupérer les utilisateurs clients par email
-    const marie = await Utilisateurs.findBy('email', 'marie.dupont@gmail.com')
-    const jean = await Utilisateurs.findBy('email', 'jean.martin@outlook.fr')
-
-    if (!marie || !jean) {
-      console.log('❌ Utilisateurs clients non trouvés, vérifiez le seeder utilisateurs')
-      return
-    }
-
     // Vérifier si des clients existent déjà
-    const existingClients = await this.client.from('clients').select('*').limit(1)
+    const existingClients = await Client.query().limit(1)
     if (existingClients.length > 0) {
       console.log('Des clients existent déjà, seeder ignoré')
       return
     }
 
+    // ✅ CLIENTS BASÉS SUR LES UTILISATEURS CRÉÉS
     const clients = [
       {
-        id: marie.id,
+        id: 2, // Marie Dupont - Rivoli
         loyalty_points: 150,
         preferred_payment_method: 'carte_bancaire',
-        created_at: new Date(),
-        updated_at: new Date(),
       },
       {
-        id: jean.id,
-        loyalty_points: 75,
-        preferred_payment_method: 'paypal',
-        created_at: new Date(),
-        updated_at: new Date(),
+        id: 3, // Jean Martin - Champs-Élysées
+        loyalty_points: 250,
+        preferred_payment_method: 'stripe',
+      },
+      {
+        id: 4, // Sophie Bernard - Opéra
+        loyalty_points: 50,
+        preferred_payment_method: 'carte_bancaire',
       },
     ]
 
-    await this.client.table('clients').insert(clients)
-    console.log('✅ Clients créés avec succès')
+    for (const clientData of clients) {
+      await Client.create(clientData)
+    }
+
+    console.log('✅ 3 clients créés avec des profils différents')
   }
 }

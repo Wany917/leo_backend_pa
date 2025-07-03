@@ -77,7 +77,11 @@ export default class CodeTemporairesController {
 
         // NOUVELLE LOGIQUE : Libération automatique des fonds
         if (livraisonId) {
-          await this.libererFondsLivraison(livraisonId)
+          // Récupérer le montant de la livraison
+          const livraison = await Livraison.find(livraisonId)
+          if (livraison && livraison.amount) {
+            await this.libererFondsLivraison(livraisonId, livraison.amount)
+          }
         } else if (serviceId) {
           await this.libererFondsService(serviceId)
         }
@@ -119,44 +123,51 @@ export default class CodeTemporairesController {
         return response.badRequest({ error_message: 'Code invalide' })
       }
 
-      // Récupérer la livraison
-      const livraison = await Livraison.query()
-        .where('id', livraisonId)
-        .preload('livreur')
-        .preload('client')
-        .firstOrFail()
+      // 🔍 RÉCUPÉRER LE MONTANT RÉEL DE LA LIVRAISON
+      const livraison = await Livraison.find(livraisonId)
 
-      // Vérifier que la livraison est en cours
-      if (livraison.status !== 'in_progress') {
-        return response.badRequest({ error_message: 'Livraison non éligible pour validation' })
+      if (!livraison) {
+        return response.badRequest({
+          success: false,
+          message: 'Livraison introuvable',
+        })
       }
 
-      // Supprimer le code
-      await CodeTemporaire.query().where('user_info', userInfo).where('code', code).delete()
+      const montantALiberer = livraison.amount || 0
+      console.log('💰 Montant à libérer depuis la livraison:', montantALiberer, '€')
 
-      // Mettre à jour le statut de la livraison
-      livraison.status = 'completed'
-      livraison.deliveredAt = DateTime.now()
-      await livraison.save()
+      if (montantALiberer <= 0) {
+        return response.badRequest({
+          success: false,
+          message: 'Aucun montant à libérer pour cette livraison',
+        })
+      }
 
-      // Libérer les fonds
-      await this.libererFondsLivraison(livraisonId)
-
-      console.log('✅ LIVRAISON VALIDÉE - Fonds libérés pour livreur', livraison.livreur.id)
+      await this.libererFondsLivraison(livraisonId, montantALiberer)
+      console.log('✅ FONDS LIBÉRÉS AVEC SUCCÈS')
 
       return response.ok({
         success: true,
-        message: 'Livraison validée et fonds libérés',
-        livraison: {
-          id: livraison.id,
-          status: livraison.status,
-          deliveredAt: livraison.deliveredAt,
-        },
+        message: 'Livraison validée et fonds libérés au livreur',
       })
     } catch (error) {
-      console.log('🔴 ERREUR VALIDATION LIVRAISON:', error)
-      return response.badRequest({
-        error_message: 'Erreur lors de la validation de la livraison',
+      console.error('🔴 ERREUR VALIDATION LIVRAISON:', error)
+
+      // 🚨 GESTION SPÉCIFIQUE DE L'ERREUR DE FONDS INSUFFISANTS
+      if (error.message?.includes('Solde en attente insuffisant')) {
+        return response.badRequest({
+          success: false,
+          message:
+            "Le paiement n'a pas encore été reçu ou traité. Veuillez réessayer dans quelques minutes.",
+          error_code: 'INSUFFICIENT_PENDING_BALANCE',
+          details: 'Les fonds ne sont pas encore disponibles dans le portefeuille du livreur',
+        })
+      }
+
+      // Autres erreurs
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la validation de la livraison',
         error: error.message,
       })
     }
@@ -196,7 +207,7 @@ export default class CodeTemporairesController {
   /**
    * Libérer les fonds pour une livraison
    */
-  private async libererFondsLivraison(livraisonId: number) {
+  private async libererFondsLivraison(livraisonId: number, montantALiberer: number) {
     try {
       const livraison = await Livraison.query()
         .where('id', livraisonId)
@@ -204,10 +215,10 @@ export default class CodeTemporairesController {
         .preload('client')
         .firstOrFail()
 
-      console.log('💰 LIBÉRATION FONDS LIVRAISON - Montant:', livraison.price, '€')
+      console.log('💰 LIBÉRATION FONDS LIVRAISON - Montant:', montantALiberer, '€')
 
-      if (!livraison.price) {
-        throw new Error('Prix de la livraison non défini')
+      if (!montantALiberer) {
+        throw new Error('Montant à libérer non défini')
       }
 
       if (!livraison.livreur?.id) {
@@ -230,46 +241,23 @@ export default class CodeTemporairesController {
         })
       }
 
-      // Calculer commission EcoDeli (5%)
-      const commission = livraison.price * 0.05
-      const montantLivreur = livraison.price - commission
-
       // Libérer les fonds pour le livreur
-      await portefeuille.libererFonds(montantLivreur)
+      await portefeuille.libererFonds(montantALiberer)
 
       // Enregistrer les transactions
       await TransactionPortefeuille.create({
         portefeuilleId: portefeuille.id,
         utilisateurId: livraison.livreur.id,
         typeTransaction: 'liberation',
-        montant: montantLivreur,
-        soldeAvant: portefeuille.soldeDisponible - montantLivreur,
+        montant: montantALiberer,
+        soldeAvant: portefeuille.soldeDisponible - montantALiberer,
         soldeApres: portefeuille.soldeDisponible,
         description: `Libération fonds livraison #${livraison.id}`,
         livraisonId: livraison.id,
         statut: 'completed',
       })
 
-      // Enregistrer la commission EcoDeli
-      await TransactionPortefeuille.create({
-        portefeuilleId: portefeuille.id,
-        utilisateurId: livraison.livreur.id,
-        typeTransaction: 'commission',
-        montant: commission,
-        soldeAvant: portefeuille.soldeDisponible,
-        soldeApres: portefeuille.soldeDisponible,
-        description: `Commission EcoDeli (5%) - Livraison #${livraison.id}`,
-        livraisonId: livraison.id,
-        statut: 'completed',
-      })
-
-      console.log(
-        '✅ FONDS LIBÉRÉS - Livreur reçoit:',
-        montantLivreur,
-        '€, Commission EcoDeli:',
-        commission,
-        '€'
-      )
+      console.log('✅ FONDS LIBÉRÉS - Livreur reçoit:', montantALiberer, '€')
     } catch (error) {
       console.error('🔴 ERREUR LIBÉRATION FONDS LIVRAISON:', error)
       throw error

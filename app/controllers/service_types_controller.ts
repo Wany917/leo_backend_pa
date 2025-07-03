@@ -20,7 +20,7 @@ export default class ServiceTypesController {
   async store({ request, response }: HttpContext) {
     try {
       const { name, description, is_active } = request.body()
-      
+
       const serviceType = await ServiceType.create({
         name,
         description: description || null,
@@ -87,13 +87,16 @@ export default class ServiceTypesController {
       const serviceType = await ServiceType.findOrFail(params.id)
       serviceType.is_active = !serviceType.is_active
       await serviceType.save()
-      
-      return response.ok({ 
-        serviceType, 
-        message: `Service type ${serviceType.is_active ? 'activated' : 'deactivated'} successfully` 
+
+      return response.ok({
+        serviceType,
+        message: `Service type ${serviceType.is_active ? 'activated' : 'deactivated'} successfully`,
       })
     } catch (error) {
-      return response.badRequest({ message: 'Failed to toggle service type status', error: error.message })
+      return response.badRequest({
+        message: 'Failed to toggle service type status',
+        error: error.message,
+      })
     }
   }
 }
