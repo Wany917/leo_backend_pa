@@ -117,15 +117,38 @@ export default class Prestataire extends BaseModel {
   }
 
   /**
-   * Met à jour la note moyenne du prestataire
+   * Met à jour la note moyenne du prestataire basée sur les vrais avis
    */
   async updateRating(): Promise<void> {
-    // Simulation - dans un vrai projet, calculer depuis la table ratings
-    // const ratings = await Rating.query().where('reviewed_id', this.id)
-    // const avgRating = ratings.reduce((sum, rating) => sum + rating.overall_rating, 0) / ratings.length
+    const Rating = (await import('#models/rating')).default
 
-    // Pour la démo, générer une note aléatoire entre 4.0 et 5.0
-    this.rating = Math.round((4.0 + Math.random()) * 10) / 10
+    const ratings = await Rating.query()
+      .where('reviewed_id', this.id)
+      .where('rating_type', 'service')
+      .where('is_visible', true)
+
+    if (ratings.length > 0) {
+      // Conversion explicite en nombre pour éviter les NaN
+      const validRatings = ratings
+        .map((rating) => {
+          const numRating =
+            typeof rating.overall_rating === 'string'
+              ? parseFloat(rating.overall_rating)
+              : rating.overall_rating
+          return !isNaN(numRating) ? numRating : null
+        })
+        .filter((rating) => rating !== null) as number[]
+
+      if (validRatings.length > 0) {
+        const totalRating = validRatings.reduce((sum, rating) => sum + rating, 0)
+        this.rating = Math.round((totalRating / validRatings.length) * 10) / 10
+      } else {
+        this.rating = null
+      }
+    } else {
+      this.rating = null // Pas d'avis = pas de note
+    }
+
     await this.save()
   }
 

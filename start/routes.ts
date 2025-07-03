@@ -33,8 +33,10 @@ const JustificationPiecesController = () => import('#controllers/justification_p
 const TrackingController = () => import('#controllers/tracking_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 const FilesController = () => import('#controllers/files_controller')
+const BookingsController = () => import('#controllers/bookings_controller')
 const PortefeuilleController = () => import('#controllers/portefeuille_controller')
 const StripeController = () => import('#controllers/stripe_controller')
+const RatingController = () => import('#controllers/rating_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -127,6 +129,7 @@ router
     router.post('add', [PrestataireController, 'add'])
     router.get(':id', [PrestataireController, 'getProfile'])
     router.put(':id', [PrestataireController, 'updateProfile'])
+    router.get(':id/reviews', [PrestataireController, 'getReviews']).use(middleware.auth())
   })
   .prefix('prestataires')
 
@@ -286,19 +289,16 @@ router
     router.get(':id', [ServicesController, 'show'])
     router.put(':id', [ServicesController, 'update'])
     router.delete(':id', [ServicesController, 'delete'])
+
+    // Routes pour la validation des services (admin)
+    router
+      .get('pending', [ServicesController, 'getPendingServices'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .post(':id/validate', [ServicesController, 'validateService'])
+      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('services')
-
-router
-  .group(() => {
-    router.get('/', [ServiceTypesController, 'index'])
-    router.post('/', [ServiceTypesController, 'store'])
-    router.put(':id/toggle-status', [ServiceTypesController, 'toggleStatus'])
-    router.get(':id', [ServiceTypesController, 'show'])
-    router.put(':id', [ServiceTypesController, 'update'])
-    router.delete(':id', [ServiceTypesController, 'destroy'])
-  })
-  .prefix('service-types')
 
 router
   .group(() => {
@@ -434,6 +434,43 @@ router
   })
   .prefix('map')
 
+// Routes pour les bookings
+router
+  .group(() => {
+    // Routes publiques/CRUD basiques
+    router.get('/', [BookingsController, 'index']).use(middleware.auth())
+    router.post('/', [BookingsController, 'create']).use(middleware.auth())
+    router.get(':id', [BookingsController, 'show']).use(middleware.auth())
+    router.put(':id/status', [BookingsController, 'updateStatus']).use(middleware.auth())
+
+    // Routes par client
+    router.get('client/:clientId', [BookingsController, 'getClientBookings']).use(middleware.auth())
+
+    // Routes par prestataire
+    router
+      .get('provider/:prestataireId', [BookingsController, 'getProviderBookings'])
+      .use(middleware.auth())
+
+    // Statistiques admin
+    router
+      .get('admin/stats', [BookingsController, 'getBookingStats'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('bookings')
+
+// Routes pour les types de services
+router
+  .group(() => {
+    router.get('/', [ServiceTypesController, 'index'])
+    router.post('/', [ServiceTypesController, 'create']).use(middleware.auth())
+    router.get('stats', [ServiceTypesController, 'getStats']).use(middleware.auth())
+    router.get(':id', [ServiceTypesController, 'show'])
+    router.put(':id', [ServiceTypesController, 'update']).use(middleware.auth())
+    router.put(':id/toggle-status', [ServiceTypesController, 'toggleStatus']).use(middleware.auth())
+    router.delete(':id', [ServiceTypesController, 'destroy']).use(middleware.auth())
+  })
+  .prefix('service-types')
+
 // ===============================================
 // ROUTES PORTEFEUILLE ECODELI
 // ===============================================
@@ -460,6 +497,29 @@ router
       .use([middleware.auth(), middleware.admin()])
   })
   .prefix('portefeuille')
+
+// ===============================================
+// ROUTES RATINGS/AVIS
+// ===============================================
+router
+  .group(() => {
+    // Création d'avis (authentifié)
+    router.post('/', [RatingController, 'create']).use(middleware.auth())
+
+    // Récupération avis par prestataire (public)
+    router.get('prestataire/:prestataireId', [RatingController, 'getByPrestataire'])
+
+    // Récupération avis par service (public)
+    router.get('service/:serviceId', [RatingController, 'getByService'])
+
+    // Modération admin
+    router
+      .get('admin/all', [RatingController, 'getAllForAdmin'])
+      .use([middleware.auth(), middleware.admin()])
+    router.put(':id', [RatingController, 'update']).use([middleware.auth(), middleware.admin()])
+    router.delete(':id', [RatingController, 'delete']).use(middleware.auth())
+  })
+  .prefix('ratings')
 
 // ===============================================
 // ROUTES STRIPE - PAIEMENTS & ABONNEMENTS
