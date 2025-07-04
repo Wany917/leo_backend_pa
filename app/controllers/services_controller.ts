@@ -36,12 +36,13 @@ export default class ServicesController {
       return response.ok({
         data: services.map((service) => ({
           ...service.serialize(),
-          prestataireNme:
+          prestataireName:
             service.prestataire?.user?.first_name + ' ' + service.prestataire?.user?.last_name,
           prestataireEmail: service.prestataire?.user?.email,
           prestataireRating: service.prestataire?.rating,
           serviceTypeName: service.serviceType?.name || null,
           service_type_name: service.serviceType?.name || null, // Alias pour le frontend
+          isActive: service.isActive, // Assurer que isActive est bien retourné
         })),
         total: services.length,
         prestataire_id: prestataireId || null,
@@ -486,7 +487,11 @@ export default class ServicesController {
   async validateService({ request, response }: HttpContext) {
     try {
       const serviceId = request.param('id')
-      const { validation_status: validationStatus, admin_comments: adminComments } = request.body()
+      const {
+        validation_status: validationStatus,
+        admin_comments: adminComments,
+        require_justifications: requireJustifications = true,
+      } = request.body()
 
       if (!['approved', 'rejected', 'pending'].includes(validationStatus)) {
         return response.status(400).send({
@@ -495,6 +500,33 @@ export default class ServicesController {
       }
 
       const service = await Service.findOrFail(serviceId)
+
+      // Charger le prestataire et ses justificatifs
+      await service.load('prestataire', (prestataireQuery) => {
+        prestataireQuery.preload('user')
+      })
+
+      // Vérifier les justificatifs si nécessaire
+      if (requireJustifications && validationStatus === 'approved') {
+        const justifications = await db
+          .from('justification_pieces')
+          .where('utilisateur_id', service.prestataire?.user?.id)
+          .where('account_type', 'prestataire')
+          .where('verification_status', 'verified')
+
+        if (justifications.length === 0) {
+          return response.status(400).send({
+            error_message:
+              'Cannot approve service: No verified justifications found for this provider',
+            requires_justifications: true,
+            available_justifications: await db
+              .from('justification_pieces')
+              .where('utilisateur_id', service.prestataire?.user?.id)
+              .where('account_type', 'prestataire')
+              .select('id', 'document_type', 'verification_status'),
+          })
+        }
+      }
 
       // Mise à jour du statut selon la validation
       let newStatus: string
@@ -530,6 +562,7 @@ export default class ServicesController {
         message: `Service ${validationStatus} successfully`,
         service: service.serialize(),
         admin_comments: adminComments || null,
+        justifications_verified: requireJustifications && validationStatus === 'approved',
       })
     } catch (error) {
       console.error('Service validation error:', error)
@@ -542,8 +575,8 @@ export default class ServicesController {
 
   /**
    * @tag Services - Admin
-   * @summary Services en attente de validation
-   * @description Récupère tous les services en statut 'pending' pour validation admin
+   * @summary Services en attente de validation avec justificatifs
+   * @description Récupère tous les services en statut 'pending' avec leurs pièces justificatives
    */
   async getPendingServices({ response }: HttpContext) {
     try {
@@ -555,14 +588,43 @@ export default class ServicesController {
         .preload('serviceType')
         .orderBy('created_at', 'desc')
 
+      // Récupérer les pièces justificatives pour chaque prestataire
+      const servicesWithJustifications = await Promise.all(
+        pendingServices.map(async (service) => {
+          const justifications = await db
+            .from('justification_pieces')
+            .where('utilisateur_id', service.prestataire?.user?.id)
+            .where('account_type', 'prestataire')
+            .orderBy('created_at', 'desc')
+
+          return {
+            ...service.serialize(),
+            prestataire_name: service.prestataire?.user
+              ? `${service.prestataire.user.first_name} ${service.prestataire.user.last_name}`
+              : 'Prestataire inconnu',
+            service_type_name: service.serviceType?.name || 'Type non défini',
+            prestataire_email: service.prestataire?.user?.email || 'Email non disponible',
+            justifications: justifications.map((justif) => ({
+              id: justif.id,
+              document_type: justif.document_type,
+              file_path: justif.file_path,
+              verification_status: justif.verification_status,
+              uploaded_at: justif.uploaded_at,
+              verified_at: justif.verified_at,
+            })),
+            has_verified_justifications: justifications.some(
+              (j) => j.verification_status === 'verified'
+            ),
+            total_justifications: justifications.length,
+            pending_justifications: justifications.filter(
+              (j) => j.verification_status === 'pending'
+            ).length,
+          }
+        })
+      )
+
       return response.ok({
-        pending_services: pendingServices.map((service) => ({
-          ...service.serialize(),
-          prestataire_name: service.prestataire?.user
-            ? `${service.prestataire.user.first_name} ${service.prestataire.user.last_name}`
-            : 'Prestataire inconnu',
-          service_type_name: service.serviceType?.name || 'Type non défini',
-        })),
+        pending_services: servicesWithJustifications,
         total_pending: pendingServices.length,
       })
     } catch (error) {

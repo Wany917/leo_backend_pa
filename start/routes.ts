@@ -286,17 +286,19 @@ router
   .group(() => {
     router.get('/', [ServicesController, 'index'])
     router.post('/', [ServicesController, 'create'])
-    router.get(':id', [ServicesController, 'show'])
-    router.put(':id', [ServicesController, 'update'])
-    router.delete(':id', [ServicesController, 'delete'])
 
-    // Routes pour la validation des services (admin)
+    // Routes pour la validation des services (admin) - AVANT les routes avec :id
     router
       .get('pending', [ServicesController, 'getPendingServices'])
       .use([middleware.auth(), middleware.admin()])
     router
       .post(':id/validate', [ServicesController, 'validateService'])
       .use([middleware.auth(), middleware.admin()])
+
+    // Routes avec paramètres - APRÈS les routes spécifiques
+    router.get(':id', [ServicesController, 'show'])
+    router.put(':id', [ServicesController, 'update'])
+    router.delete(':id', [ServicesController, 'delete'])
   })
   .prefix('services')
 

@@ -98,12 +98,47 @@ export default class extends BaseSeeder {
         paymentIntentId: 'pi_test_validation_code_001',
         deliveredAt: DateTime.fromJSDate(new Date('2025-01-28T14:45:00')),
       },
+
+      // =================================================================
+      // LIVRAISON 6: Livraison annulée pour tests
+      // LIVRAISON ANNULÉE
+      // =================================================================
+      {
+        clientId: 4, // Sophie Bernard
+        livreurId: null, // Pas de livreur assigné
+        annonceId: null, // Pas d'annonce
+        status: 'cancelled' as const,
+        pickupLocation: '10 rue du Commerce, 75015 Paris',
+        dropoffLocation: '22 rue de la Pompe, 75016 Paris',
+        price: 28.0,
+        amount: 0.0, // Remboursé
+        paymentStatus: 'paid' as const, // Remboursé
+        paymentIntentId: 'pi_test_cancelled_001',
+      },
+
+      // =================================================================
+      // LIVRAISON 7: Livraison terminée et payée
+      // LIVRAISON TERMINÉE ET PAYÉE
+      // =================================================================
+      {
+        clientId: 2, // Marie Dupont
+        livreurId: 7, // Fatima Alaoui
+        annonceId: null, // Pas d'annonce
+        status: 'completed' as const,
+        pickupLocation: '5 rue de la Bourse, 75002 Paris',
+        dropoffLocation: '12 rue de la Roquette, 75011 Paris',
+        price: 19.5,
+        amount: 19.5,
+        paymentStatus: 'paid' as const, // Payé et libéré
+        paymentIntentId: 'pi_test_completed_001',
+        deliveredAt: DateTime.fromJSDate(new Date('2025-01-27T16:30:00')),
+      },
     ]
 
     for (const livraisonData of livraisons) {
       await Livraison.create(livraisonData)
     }
 
-    console.log('✅ 5 livraisons créées avec scénarios de paiement variés')
+    console.log('✅ 7 livraisons créées avec scénarios de paiement variés')
   }
 }
