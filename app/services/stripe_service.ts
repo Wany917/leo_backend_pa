@@ -209,6 +209,33 @@ export default class StripeService {
   }
 
   /**
+   * 🆕 Crée un Payment Intent pour une recharge de cagnotte
+   * Capture automatique (pas d'escrow pour les recharges)
+   */
+  static async createWalletRechargePayment(
+    utilisateur: Utilisateurs,
+    amount: number,
+    description: string
+  ): Promise<Stripe.PaymentIntent> {
+    const customerId = await this.getOrCreateStripeCustomer(utilisateur)
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'eur',
+      customer: customerId,
+      description,
+      metadata: {
+        type: 'wallet_recharge',
+        utilisateur_id: utilisateur.id.toString(),
+        montant_euros: (amount / 100).toString(),
+      },
+      capture_method: 'automatic', // Capture automatique pour les recharges
+    })
+
+    return paymentIntent
+  }
+
+  /**
    * Capture et distribue un paiement
    */
   static async captureAndDistributePayment(
@@ -453,5 +480,279 @@ export default class StripeService {
   private static async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     console.log(`💰 Facture payée: ${invoice.id} - ${invoice.amount_paid / 100}€`)
     // Ici on pourrait enregistrer le paiement dans la table payments
+  }
+
+  /**
+   * 🔧 METTRE À JOUR LES MÉTADONNÉES D'UN PAYMENT INTENT
+   */
+  static async updatePaymentIntentMetadata(
+    paymentIntentId: string,
+    metadata: Record<string, string>
+  ): Promise<void> {
+    try {
+      await stripe.paymentIntents.update(paymentIntentId, {
+        metadata: metadata,
+      })
+      console.log(`✅ Métadonnées mises à jour pour Payment Intent ${paymentIntentId}`)
+    } catch (error) {
+      console.error('❌ Erreur mise à jour métadonnées:', error)
+      throw error
+    }
+  }
+
+  // ===============================================
+  // 🆕 STRIPE CONNECT - GESTION DES COMPTES LIVREURS
+  // ===============================================
+
+  /**
+   * Créer un compte Stripe Connect Express pour un livreur
+   * Permet les virements automatiques SEPA vers son compte bancaire
+   */
+  static async createExpressAccountForDeliveryman(
+    livreurId: number,
+    email: string,
+    country: string = 'FR'
+  ): Promise<string> {
+    try {
+      console.log(`🏦 Création compte Stripe Connect pour livreur ${livreurId}`)
+
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: country,
+        email: email,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: 'individual',
+        metadata: {
+          ecodeli_livreur_id: livreurId.toString(),
+          account_type: 'deliveryman',
+        },
+      })
+
+      console.log(`✅ Compte Stripe Connect créé: ${account.id}`)
+      return account.id
+    } catch (error) {
+      console.error('❌ Erreur création compte Connect:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Créer un lien d'onboarding pour que le livreur configure son compte
+   */
+  static async createAccountOnboardingLink(
+    stripeAccountId: string,
+    returnUrl: string,
+    refreshUrl: string
+  ): Promise<string> {
+    try {
+      const accountLink = await stripe.accountLinks.create({
+        account: stripeAccountId,
+        refresh_url: refreshUrl,
+        return_url: returnUrl,
+        type: 'account_onboarding',
+      })
+
+      console.log(`🔗 Lien d'onboarding créé pour compte ${stripeAccountId}`)
+      return accountLink.url
+    } catch (error) {
+      console.error('❌ Erreur création lien onboarding:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Vérifier si un compte Connect est entièrement configuré
+   */
+  static async checkAccountStatus(stripeAccountId: string): Promise<{
+    charges_enabled: boolean
+    payouts_enabled: boolean
+    details_submitted: boolean
+    requirements: any
+  }> {
+    try {
+      const account = await stripe.accounts.retrieve(stripeAccountId)
+
+      return {
+        charges_enabled: account.charges_enabled,
+        payouts_enabled: account.payouts_enabled,
+        details_submitted: account.details_submitted,
+        requirements: account.requirements,
+      }
+    } catch (error) {
+      console.error('❌ Erreur vérification compte:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 💰 EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE ECODELI
+   * Transfert des fonds du portefeuille vers le compte Stripe Connect du livreur
+   */
+  static async transferFromWalletToDeliveryman(
+    montantEuros: number,
+    livreurStripeAccountId: string,
+    description: string = 'Virement depuis portefeuille EcoDeli'
+  ): Promise<{
+    transfer_id: string
+    amount: number
+    status: string
+  }> {
+    try {
+      console.log(`💸 Virement de ${montantEuros}€ vers compte ${livreurStripeAccountId}`)
+
+      // Convertir en centimes
+      const montantCentimes = Math.round(montantEuros * 100)
+
+      // Créer le transfer vers le compte Connect
+      const transfer = await stripe.transfers.create({
+        amount: montantCentimes,
+        currency: 'eur',
+        destination: livreurStripeAccountId,
+        description: description,
+        metadata: {
+          source: 'ecodeli_wallet',
+          transfer_type: 'wallet_payout',
+        },
+      })
+
+      console.log(`✅ Transfer créé: ${transfer.id} - ${montantEuros}€`)
+
+      return {
+        transfer_id: transfer.id,
+        amount: montantEuros,
+        status: 'created',
+      }
+    } catch (error) {
+      console.error('❌ Erreur transfer vers livreur:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Configurer les virements automatiques pour un compte Connect
+   */
+  static async configureAutomaticPayouts(
+    stripeAccountId: string,
+    schedule: 'daily' | 'weekly' | 'monthly' = 'daily',
+    delayDays: number = 2
+  ): Promise<void> {
+    try {
+      await stripe.accounts.update(stripeAccountId, {
+        settings: {
+          payouts: {
+            schedule: {
+              interval: schedule,
+              delay_days: delayDays,
+            },
+          },
+        },
+      })
+
+      console.log(`⚙️ Virements automatiques configurés pour ${stripeAccountId}`)
+    } catch (error) {
+      console.error('❌ Erreur configuration virements auto:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Créer un lien vers le dashboard Express pour que le livreur gère son compte
+   */
+  static async createExpressDashboardLink(stripeAccountId: string): Promise<string> {
+    try {
+      const loginLink = await stripe.accounts.createLoginLink(stripeAccountId)
+      return loginLink.url
+    } catch (error) {
+      console.error('❌ Erreur création lien dashboard:', error)
+      throw error
+    }
+  }
+
+  // ===============================================
+  // 🆕 STRIPE CONNECT - GESTION DES COMPTES CLIENTS MULTI-RÔLES
+  // ===============================================
+
+  /**
+   * Créer un compte Stripe Connect Express pour un client multi-rôles
+   * Permet aux clients qui proposent des services de recevoir des paiements
+   */
+  static async createExpressAccountForClient(
+    clientId: number,
+    email: string,
+    country: string = 'FR',
+    isServiceProvider: boolean = false
+  ): Promise<string> {
+    try {
+      console.log(
+        `🏦 Création compte Stripe Connect pour client ${clientId} (prestataire: ${isServiceProvider})`
+      )
+
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: country,
+        email: email,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: 'individual',
+        metadata: {
+          ecodeli_client_id: clientId.toString(),
+          account_type: 'client',
+          is_service_provider: isServiceProvider.toString(),
+        },
+      })
+
+      console.log(`✅ Compte Stripe Connect créé pour client: ${account.id}`)
+      return account.id
+    } catch (error) {
+      console.error('❌ Erreur création compte Connect client:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 💰 EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE CLIENT
+   * Transfert des fonds du portefeuille vers le compte Stripe Connect du client
+   */
+  static async transferFromWalletToClient(
+    montantEuros: number,
+    clientStripeAccountId: string,
+    description: string = 'Virement client depuis portefeuille EcoDeli'
+  ): Promise<{
+    transfer_id: string
+    amount: number
+    status: string
+  }> {
+    try {
+      console.log(`💸 Virement client de ${montantEuros}€ vers compte ${clientStripeAccountId}`)
+
+      // Convertir en centimes
+      const montantCentimes = Math.round(montantEuros * 100)
+
+      // Créer le transfer vers le compte Connect
+      const transfer = await stripe.transfers.create({
+        amount: montantCentimes,
+        currency: 'eur',
+        destination: clientStripeAccountId,
+        description: description,
+        metadata: {
+          source: 'ecodeli_wallet',
+          transfer_type: 'client_wallet_payout',
+        },
+      })
+
+      console.log(`✅ Transfer client créé: ${transfer.id} - ${montantEuros}€`)
+
+      return {
+        transfer_id: transfer.id,
+        amount: montantEuros,
+        status: 'created',
+      }
+    } catch (error) {
+      console.error('❌ Erreur transfer vers client:', error)
+      throw error
+    }
   }
 }

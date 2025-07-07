@@ -1,7 +1,10 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Service from '#models/service'
 import Prestataire from '#models/prestataire'
-// import ServiceType from '#models/service_type'
+import ServiceType from '#models/service_type'
+import Client from '#models/client'
+import PortefeuilleEcodeli from '#models/portefeuille_ecodeli'
+import TransactionPortefeuille from '#models/transaction_portefeuille'
 import { DateTime } from 'luxon'
 import { serviceValidator } from '#validators/create_service'
 import db from '@adonisjs/lucid/services/db'
@@ -112,25 +115,51 @@ export default class ServicesController {
         requires_materials,
       } = await request.validateUsing(serviceValidator)
 
+      // Validate and parse datetime fields
+      let parsedStartDate: DateTime | undefined
+      let parsedEndDate: DateTime | undefined
+
+      if (startDate) {
+        parsedStartDate = DateTime.fromISO(startDate)
+        if (!parsedStartDate.isValid) {
+          return response.status(400).send({
+            error_message:
+              'Invalid start_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
+            received: startDate,
+          })
+        }
+      }
+
+      if (endDate) {
+        parsedEndDate = DateTime.fromISO(endDate)
+        if (!parsedEndDate.isValid) {
+          return response.status(400).send({
+            error_message:
+              'Invalid end_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
+            received: endDate,
+          })
+        }
+      }
+
+      // Validate that end_date is after start_date
+      if (parsedStartDate && parsedEndDate && parsedEndDate <= parsedStartDate) {
+        return response.status(400).send({
+          error_message: 'End date must be after start date',
+        })
+      }
+
       // Validate required fields
-      if (!name || !description || price === undefined || price === null || !location) {
-        return response.status(400).send({
-          error_message: 'Missing required fields: name, description, price, location are required',
-        })
-      }
-
-      // Validate price is a valid number >= 0
-      if (Number.isNaN(price) || price < 0) {
-        return response.status(400).send({
-          error_message: 'Price must be a non-negative number',
-        })
-      }
-
-      // For hourly pricing, price can be 0 but hourly_rate must be > 0
-      if (pricing_type === 'hourly' && price === 0 && (!hourly_rate || hourly_rate <= 0)) {
+      if (!name || !description || !price || !location || !startDate || !endDate) {
         return response.status(400).send({
           error_message:
-            'For hourly pricing, hourly_rate must be a positive number when price is 0',
+            'Missing required fields: name, description, price, location, start_date, end_date are required',
+        })
+      }
+
+      // Validate price is a positive number
+      if (Number.isNaN(price) || price <= 0) {
+        return response.status(400).send({
+          error_message: 'Price must be a positive number',
         })
       }
 
@@ -350,40 +379,15 @@ export default class ServicesController {
       const latitude = Number.parseFloat(lat)
       const longitude = Number.parseFloat(lng)
       const radiusKm = Number.parseFloat(radius)
-      const limit = Number.parseInt(request.qs().limit || '20')
-      const page = Number.parseInt(request.qs().page || '1')
 
-      // Validation des paramètres
-      if (Number.isNaN(latitude) || latitude < -90 || latitude > 90) {
+      if (Number.isNaN(latitude) || Number.isNaN(longitude) || Number.isNaN(radiusKm)) {
         return response.status(400).send({
-          error_message: 'Invalid latitude (must be between -90 and 90)',
+          error_message: 'Invalid coordinates or radius',
         })
       }
 
-      if (Number.isNaN(longitude) || longitude < -180 || longitude > 180) {
-        return response.status(400).send({
-          error_message: 'Invalid longitude (must be between -180 and 180)',
-        })
-      }
-
-      if (Number.isNaN(radiusKm) || radiusKm <= 0 || radiusKm > 100) {
-        return response.status(400).send({
-          error_message: 'Invalid radius (must be between 0 and 100 km)',
-        })
-      }
-
-      if (Number.isNaN(limit) || limit < 1 || limit > 100) {
-        return response.status(400).send({
-          error_message: 'Invalid limit value (must be between 1 and 100)',
-        })
-      }
-
-      if (Number.isNaN(page) || page < 1) {
-        return response.status(400).send({
-          error_message: 'Invalid page number',
-        })
-      }
-
+      // Pour cette démo, retourner tous les services actifs
+      // Dans un vrai projet, utiliser une requête spatiale
       const services = await Service.query()
         .where('is_active', true)
         .where('status', 'available')
@@ -846,5 +850,404 @@ export default class ServicesController {
     }
 
     return availableSlots
+  }
+
+  // ===============================================
+  // 🆕 SYSTÈME PAIEMENT SERVICES PRESTATAIRES CLIENTS
+  // ===============================================
+
+  /**
+   * 💰 FINALISER SERVICE ET DISTRIBUER GAINS
+   * Marque un service comme terminé et distribue les gains au prestataire
+   */
+  async completeServiceAndDistributePayment({ request, response, auth }: HttpContext) {
+    try {
+      const serviceId = request.param('id')
+      const { payment_intent_id: paymentIntentId, validation_code: validationCode } = request.only([
+        'payment_intent_id',
+        'validation_code',
+      ])
+
+      const user = auth.user!
+
+      // Récupérer le service avec les relations
+      const service = await Service.query()
+        .where('id', serviceId)
+        .preload('prestataire')
+        .preload('client')
+        .first()
+
+      if (!service) {
+        return response.badRequest({
+          success: false,
+          message: 'Service introuvable',
+        })
+      }
+
+      // Vérifier que le service est payé et en cours
+      if (service.status !== 'paid' && service.status !== 'in_progress') {
+        return response.badRequest({
+          success: false,
+          message: 'Le service doit être payé pour être finalisé',
+        })
+      }
+
+      // Calculer la commission EcoDeli (8% pour les services)
+      const commission = service.price * 0.08
+      const montantPrestataire = service.price - commission
+
+      // Récupérer ou créer le portefeuille du prestataire
+      let portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', service.prestataireId)
+        .where('is_active', true)
+        .first()
+
+      if (!portefeuille) {
+        portefeuille = await PortefeuilleEcodeli.create({
+          utilisateurId: service.prestataireId,
+          soldeDisponible: 0,
+          soldeEnAttente: 0,
+          isActive: true,
+        })
+      }
+
+      // Ajouter les gains directement au solde disponible
+      const ancienSolde = portefeuille.soldeDisponible
+      portefeuille.soldeDisponible = ancienSolde + montantPrestataire
+      await portefeuille.save()
+
+      // Enregistrer la transaction de gain
+      await TransactionPortefeuille.create({
+        portefeuilleId: portefeuille.id,
+        utilisateurId: service.prestataireId,
+        typeTransaction: 'liberation',
+        montant: montantPrestataire,
+        soldeAvant: ancienSolde,
+        soldeApres: portefeuille.soldeDisponible,
+        description: `Gains service "${service.name}" - Commission EcoDeli: ${commission}€`,
+        referenceExterne: paymentIntentId || serviceId.toString(),
+        serviceId: service.id,
+        statut: 'completed',
+        metadata: JSON.stringify({
+          type: 'service_payment',
+          service_name: service.name,
+          commission_ecodeli: commission,
+          montant_brut: service.price,
+          client_id: service.clientId,
+        }),
+      })
+
+      // Marquer le service comme terminé
+      service.status = 'completed'
+      await service.save()
+
+      console.log(
+        `✅ Service ${service.id} terminé - Prestataire reçoit: ${montantPrestataire}€, Commission: ${commission}€`
+      )
+
+      return response.ok({
+        success: true,
+        message: `Service terminé avec succès. Vous avez reçu ${montantPrestataire}€ dans votre cagnotte.`,
+        data: {
+          service_id: service.id,
+          montant_recu: montantPrestataire,
+          commission_ecodeli: commission,
+          nouveau_solde: portefeuille.soldeDisponible,
+          service_status: 'completed',
+        },
+      })
+    } catch (error) {
+      console.error('❌ Erreur finalisation service:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la finalisation du service',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * 📊 RÉCUPÉRER GAINS PRESTATAIRE
+   * Statistiques des gains pour un prestataire client
+   */
+  async getProviderEarnings({ response, auth }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      // Vérifier que l'utilisateur est un prestataire
+      const prestataire = await Prestataire.query().where('id', user.id).first()
+      if (!prestataire) {
+        return response.badRequest({
+          success: false,
+          message: 'Utilisateur non trouvé en tant que prestataire',
+        })
+      }
+
+      // Récupérer le portefeuille
+      const portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', user.id)
+        .where('is_active', true)
+        .first()
+
+      if (!portefeuille) {
+        return response.ok({
+          success: true,
+          data: {
+            gains_totaux: 0,
+            gains_ce_mois: 0,
+            gains_cette_semaine: 0,
+            nombre_services_completes: 0,
+            solde_disponible: 0,
+            services_recents: [],
+          },
+        })
+      }
+
+      // Récupérer les transactions de gains (services)
+      const gainsTransactions = await TransactionPortefeuille.query()
+        .where('portefeuille_id', portefeuille.id)
+        .where('type_transaction', 'liberation')
+        .whereNotNull('service_id')
+        .orderBy('created_at', 'desc')
+
+      const gainsTotaux = gainsTransactions.reduce((total, t) => total + t.montant, 0)
+
+      // Gains du mois en cours
+      const debutMois = new Date()
+      debutMois.setDate(1)
+      debutMois.setHours(0, 0, 0, 0)
+
+      const gainsCeMois = gainsTransactions
+        .filter((t) => new Date(t.createdAt.toString()) >= debutMois)
+        .reduce((total, t) => total + t.montant, 0)
+
+      // Gains de la semaine
+      const debutSemaine = new Date()
+      debutSemaine.setDate(debutSemaine.getDate() - debutSemaine.getDay())
+      debutSemaine.setHours(0, 0, 0, 0)
+
+      const gainsCetteSemaine = gainsTransactions
+        .filter((t) => new Date(t.createdAt.toString()) >= debutSemaine)
+        .reduce((total, t) => total + t.montant, 0)
+
+      // Services complétés
+      const servicesCompletes = await Service.query()
+        .where('prestataireId', user.id)
+        .where('status', 'completed')
+        .orderBy('updated_at', 'desc')
+        .limit(5)
+
+      return response.ok({
+        success: true,
+        data: {
+          gains_totaux: gainsTotaux,
+          gains_ce_mois: gainsCeMois,
+          gains_cette_semaine: gainsCetteSemaine,
+          nombre_services_completes: gainsTransactions.length,
+          solde_disponible: portefeuille.soldeDisponible,
+          services_recents: servicesCompletes.map((service) => ({
+            id: service.id,
+            name: service.name,
+            price: service.price,
+            completed_at: service.updatedAt.toISODate(),
+            commission_ecodeli: service.price * 0.08,
+            gains_nets: service.price * 0.92,
+          })),
+          transactions_recentes: gainsTransactions.slice(0, 10).map((transaction) => ({
+            id: transaction.id,
+            montant: transaction.montant,
+            description: transaction.description,
+            date: transaction.createdAt.toISODate(),
+            metadata: transaction.getMetadataAsJson(),
+          })),
+        },
+      })
+    } catch (error) {
+      console.error('❌ Erreur récupération gains prestataire:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la récupération des gains',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * 🎯 SERVICES EN ATTENTE DE PAIEMENT
+   * Liste des services en attente de paiement pour un prestataire
+   */
+  async getPendingPaymentServices({ response, auth }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      // Vérifier que l'utilisateur est un prestataire
+      const prestataire = await Prestataire.query().where('id', user.id).first()
+      if (!prestataire) {
+        return response.badRequest({
+          success: false,
+          message: 'Utilisateur non trouvé en tant que prestataire',
+        })
+      }
+
+      // Récupérer les services en attente de paiement ou en cours
+      const servicesPendants = await Service.query()
+        .where('prestataireId', user.id)
+        .whereIn('status', ['scheduled', 'in_progress', 'paid'])
+        .orderBy('start_date', 'asc')
+
+      const servicesGroupes = {
+        scheduled: servicesPendants.filter((s) => s.status === 'scheduled'),
+        in_progress: servicesPendants.filter((s) => s.status === 'in_progress'),
+        paid: servicesPendants.filter((s) => s.status === 'paid'),
+      }
+
+      const montantTotal = servicesPendants.reduce((total, service) => {
+        // Calculer les gains nets (prix - commission 8%)
+        return total + service.price * 0.92
+      }, 0)
+
+      return response.ok({
+        success: true,
+        data: {
+          services_par_statut: servicesGroupes,
+          total_services_pendants: servicesPendants.length,
+          montant_total_attendu: montantTotal,
+          services: servicesPendants.map((service) => ({
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            price: service.price,
+            gains_nets_attendus: service.price * 0.92,
+            commission_ecodeli: service.price * 0.08,
+            status: service.status,
+            start_date: service.start_date.toISODate(),
+            end_date: service.end_date.toISODate(),
+            location: service.location,
+          })),
+        },
+      })
+    } catch (error) {
+      console.error('❌ Erreur récupération services pendants:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la récupération des services en attente',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * 📈 TABLEAU DE BORD PRESTATAIRE
+   * Vue d'ensemble des performances pour un prestataire client
+   */
+  async getProviderDashboard({ response, auth }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      // Vérifier que l'utilisateur est un prestataire
+      const prestataire = await Prestataire.query().where('id', user.id).first()
+      if (!prestataire) {
+        return response.badRequest({
+          success: false,
+          message: 'Utilisateur non trouvé en tant que prestataire',
+        })
+      }
+
+      // Statistiques générales
+      const statsGenerales = await Service.query()
+        .where('prestataireId', user.id)
+        .select(
+          db.raw('COUNT(*) as total_services'),
+          db.raw('COUNT(CASE WHEN status = "completed" THEN 1 END) as services_completes'),
+          db.raw('COUNT(CASE WHEN status = "scheduled" THEN 1 END) as services_programmes'),
+          db.raw('COUNT(CASE WHEN status = "in_progress" THEN 1 END) as services_en_cours'),
+          db.raw('SUM(CASE WHEN status = "completed" THEN price ELSE 0 END) as revenus_totaux'),
+          db.raw('AVG(CASE WHEN status = "completed" THEN price ELSE NULL END) as prix_moyen')
+        )
+        .first()
+
+      // Portefeuille
+      const portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', user.id)
+        .where('is_active', true)
+        .first()
+
+      // Services récents
+      const servicesRecents = await Service.query()
+        .where('prestataireId', user.id)
+        .orderBy('updated_at', 'desc')
+        .limit(5)
+
+      // Évolution mensuelle (derniers 6 mois)
+      const evolutionMensuelle = []
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        const debutMois = new Date(date.getFullYear(), date.getMonth(), 1)
+        const finMois = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+
+        const statsMonth = await Service.query()
+          .where('prestataireId', user.id)
+          .where('status', 'completed')
+          .whereBetween('updated_at', [debutMois.toISOString(), finMois.toISOString()])
+          .select(db.raw('COUNT(*) as services_count'), db.raw('SUM(price) as revenus'))
+          .first()
+
+        evolutionMensuelle.push({
+          mois: date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' }),
+          services_count: statsMonth?.$extras.services_count || 0,
+          revenus: (statsMonth?.$extras.revenus || 0) * 0.92, // Revenus nets
+        })
+      }
+
+      return response.ok({
+        success: true,
+        data: {
+          prestataire: {
+            id: prestataire.id,
+            service_type: prestataire.service_type,
+            rating: prestataire.rating,
+          },
+          statistiques: {
+            total_services: statsGenerales?.$extras.total_services || 0,
+            services_completes: statsGenerales?.$extras.services_completes || 0,
+            services_programmes: statsGenerales?.$extras.services_programmes || 0,
+            services_en_cours: statsGenerales?.$extras.services_en_cours || 0,
+            revenus_totaux_bruts: statsGenerales?.$extras.revenus_totaux || 0,
+            revenus_totaux_nets: (statsGenerales?.$extras.revenus_totaux || 0) * 0.92,
+            prix_moyen: statsGenerales?.$extras.prix_moyen || 0,
+            taux_completion:
+              statsGenerales?.$extras.total_services > 0
+                ? (
+                    (statsGenerales?.$extras.services_completes /
+                      statsGenerales?.$extras.total_services) *
+                    100
+                  ).toFixed(1)
+                : 0,
+          },
+          portefeuille: {
+            solde_disponible: portefeuille?.soldeDisponible || 0,
+            solde_en_attente: portefeuille?.soldeEnAttente || 0,
+            solde_total: portefeuille?.soldeTotal || 0,
+          },
+          services_recents: servicesRecents.map((service) => ({
+            id: service.id,
+            name: service.name,
+            price: service.price,
+            status: service.status,
+            date: service.start_date.toISODate(),
+          })),
+          evolution_mensuelle: evolutionMensuelle,
+          generated_at: DateTime.now().toISO(),
+        },
+      })
+    } catch (error) {
+      console.error('❌ Erreur tableau de bord prestataire:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la génération du tableau de bord',
+        error: error.message,
+      })
+    }
   }
 }
