@@ -153,8 +153,6 @@ export default class AdminController {
                 businessAddress: address || null,
                 verificationState: 'pending',
                 contactNumber: phone_number || null,
-                contractStartDate: DateTime.now(),
-                contractEndDate: DateTime.now().plus({ years: 1 }),
               })
               break
             case 'prestataire':

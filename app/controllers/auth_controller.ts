@@ -166,7 +166,7 @@ export default class AuthController {
 
       return response.ok(userData)
     } catch (error) {
-      return response.status(401).send({ message: 'Unauthorized access' })
+      return response.status(401).send({ message: 'Unauthorized access', error: error })
     }
   }
 

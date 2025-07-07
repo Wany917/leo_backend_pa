@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Utilisateurs from '#models/utilisateurs'
+import Contract from './contract.ts'
 
 export default class Commercant extends BaseModel {
   @column({ isPrimary: true })
@@ -16,12 +17,6 @@ export default class Commercant extends BaseModel {
   @column()
   declare contactNumber: string | null
 
-  @column.date()
-  declare contractStartDate: DateTime
-
-  @column.date()
-  declare contractEndDate: DateTime
-
   @column()
   declare verificationState: 'pending' | 'verified' | 'rejected'
 
@@ -30,6 +25,9 @@ export default class Commercant extends BaseModel {
     localKey: 'id',
   })
   declare user: BelongsTo<typeof Utilisateurs>
+
+  @hasMany(() => Contract)
+  declare contracts: HasMany<typeof Contract>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

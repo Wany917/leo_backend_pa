@@ -37,6 +37,8 @@ const BookingsController = () => import('#controllers/bookings_controller')
 const PortefeuilleController = () => import('#controllers/portefeuille_controller')
 const StripeController = () => import('#controllers/stripe_controller')
 const RatingController = () => import('#controllers/rating_controller')
+const ContractsController = () => import('#controllers/contracts_controller')
+const ShopkeeperDeliveriesController = () => import('#controllers/shopkeeper_deliveries_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -66,21 +68,21 @@ router.post('send-email', [EmailController, 'sendEmail'])
 
 router
   .group(() => {
-    router.post('generate-code', [CodeTemporaireController, 'generate_code'])
-    router.post('check-code', [CodeTemporaireController, 'check_code'])
-    router.post('reset-code', [CodeTemporaireController, 'reset_code'])
-    router.post('validate-delivery', [CodeTemporaireController, 'validateDelivery'])
-  })
-  .prefix('codes-temporaire')
-
-router
-  .group(() => {
     router.post('login', [AuthController, 'login'])
     router.post('register', [AuthController, 'register'])
     router.get('me', [AuthController, 'me']).use(middleware.auth())
     router.post('logout', [AuthController, 'remove_token']).use(middleware.auth())
   })
   .prefix('auth')
+
+router
+  .group(() => {
+    router.post('generate-code', [CodeTemporaireController, 'generate_code'])
+    router.post('check-code', [CodeTemporaireController, 'check_code'])
+    router.post('reset-code', [CodeTemporaireController, 'reset_code'])
+    router.post('validate-delivery', [CodeTemporaireController, 'validateDelivery'])
+  })
+  .prefix('codes-temporaire')
 
 router
   .group(() => {
@@ -120,8 +122,18 @@ router
       .use(middleware.auth())
     router.get(':id/stats', [LivreurController, 'getStats']).use(middleware.auth())
     router.put(':id/availability', [LivreurController, 'updateAvailability']).use(middleware.auth())
+
+    // Routes for shopkeeper deliveries available to livreurs
+    router
+      .group(() => {
+        router.get('/available', [ShopkeeperDeliveriesController, 'getAvailable'])
+        router.post('/:id/accept', [ShopkeeperDeliveriesController, 'accept'])
+        router.put('/:id/status', [ShopkeeperDeliveriesController, 'updateStatus'])
+      })
+      .prefix('shop-deliveries')
   })
   .prefix('livreurs')
+  .use(middleware.auth())
 
 router
   .group(() => {
@@ -142,8 +154,28 @@ router
     router.put('verify/:id', [CommercantController, 'verify'])
     router.get('unverified', [CommercantController, 'getUnverified'])
     router.get('verified', [CommercantController, 'getVerified'])
+
+    // Contract Routes
+    router
+      .group(() => {
+        router.get('/plans', [ContractsController, 'getPlans'])
+        router.get('/current', [ContractsController, 'getCurrent'])
+        router.post('/subscribe', [ContractsController, 'subscribe'])
+        router.put('/switch-plan', [ContractsController, 'switchPlan'])
+        router.post('/unsubscribe', [ContractsController, 'unsubscribe'])
+      })
+      .prefix('contracts')
+
+    // Shopkeeper Delivery Routes
+    router
+      .group(() => {
+        router.post('/', [ShopkeeperDeliveriesController, 'create'])
+        router.get('/', [ShopkeeperDeliveriesController, 'getForShopkeeper'])
+      })
+      .prefix('deliveries')
   })
   .prefix('commercants')
+  .use(middleware.auth())
 
 router
   .group(() => {
@@ -574,3 +606,21 @@ router
     router.post('stripe/webhook', [StripeController, 'webhook'])
   })
   .prefix('api')
+
+router
+  .group(() => {
+    router.post('/logout', [AuthController, 'remove_token']).use(middleware.auth())
+    router.get('/me', [AuthController, 'me'])
+    router.post('/update_user', [UtilisateursController, 'update'])
+    router.post('/check-password', [UtilisateursController, 'checkPassword'])
+    router.get('/service-types', [ServiceTypesController, 'index'])
+  })
+  .prefix('api')
+  .use(middleware.auth())
+
+// Public routes for tracking and validation
+router.get('/shopkeeper-deliveries/track/:trackingNumber', [
+  ShopkeeperDeliveriesController,
+  'getTrackingInfo',
+])
+router.post('/shopkeeper-deliveries/validate', [ShopkeeperDeliveriesController, 'validateDelivery'])

@@ -246,7 +246,7 @@ export default class JustificationPiecesController {
   async verify({ request, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-      const { comments } = request.only(['comments'])
+      // const { comments } = request.only(['comments'])
 
       // 🎯 AMÉLIORATION: Vérifier si l'utilisateur a déjà le rôle
       const userId = justificationPiece.utilisateur_id

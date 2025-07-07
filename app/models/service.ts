@@ -51,6 +51,12 @@ export default class Service extends BaseModel {
   @column({ columnName: 'is_active' })
   declare isActive: boolean
 
+  @column.dateTime()
+  declare start_date: DateTime
+
+  @column.dateTime()
+  declare end_date: DateTime
+
   @belongsTo(() => Prestataire, { foreignKey: 'prestataireId' })
   declare prestataire: BelongsTo<typeof Prestataire>
 

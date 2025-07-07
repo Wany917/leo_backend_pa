@@ -10,7 +10,7 @@ export default class Colis extends BaseModel {
   declare id: number
 
   @column({ columnName: 'annonce_id' })
-  declare annonceId: number
+  declare annonceId: number | null
 
   @column()
   declare trackingNumber: string
