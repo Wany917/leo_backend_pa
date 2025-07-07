@@ -164,7 +164,7 @@ export default class LivraisonsController {
 
       // 🚀 ENRICHIR LES LIVRAISONS AVEC LES DONNÉES DE PAIEMENT
       const enrichedLivraisons = livraisons.map((livraison) => {
-        const serialized = livraison.serialize()
+          const serialized = livraison.serialize()
 
         console.log('💰 Processing livraison payment data:', {
           id: livraison.id,
@@ -174,13 +174,13 @@ export default class LivraisonsController {
         })
 
         // Utiliser les champs de paiement du modèle
-        return {
-          ...serialized,
+          return {
+            ...serialized,
           payment_status: livraison.paymentStatus || 'unpaid',
           payment_intent_id: livraison.paymentIntentId || null,
           amount: livraison.amount || null,
-        }
-      })
+          }
+        })
 
       console.log('✅ Enriched livraisons count:', enrichedLivraisons.length)
 

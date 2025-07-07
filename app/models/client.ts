@@ -3,7 +3,6 @@ import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Utilisateurs from '#models/utilisateurs'
 
-
 export default class Client extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
@@ -13,6 +12,9 @@ export default class Client extends BaseModel {
 
   @column()
   declare preferred_payment_method: string | null
+
+  @column()
+  declare stripeAccountId: string | null
 
   @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
   declare user: BelongsTo<typeof Utilisateurs>

@@ -234,39 +234,39 @@ export default class StripeController {
    */
   async createLivraisonPayment({ request, response, auth }: HttpContext) {
     try {
-      const utilisateur = auth.user as Utilisateurs
       const {
         amount,
         livraison_id: livraisonId,
         description,
       } = request.only(['amount', 'livraison_id', 'description'])
 
-      // Validation basique
-      if (!amount || !livraisonId || !description) {
-        return response.badRequest({
-          success: false,
-          message: 'Paramètres manquants: amount, livraison_id, description requis',
-        })
+      console.log('🚀 CRÉATION PAIEMENT LIVRAISON:', {
+        amount,
+        livraisonId,
+        description,
+      })
+
+      const utilisateur = await auth.authenticate()
+      if (!utilisateur) {
+        return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
       }
 
-      // 🔍 VÉRIFIER QUE LA LIVRAISON EXISTE ET APPARTIENT AU CLIENT
+      // Vérifier que la livraison existe
       const LivraisonModel = await import('#models/livraison')
       const Livraison = LivraisonModel.default
-      const livraison = await Livraison.query().where('id', livraisonId).preload('client').first()
-
+      const livraison = await Livraison.find(livraisonId)
       if (!livraison) {
         return response.badRequest({
           success: false,
-          message: 'Livraison non trouvée',
+          message: 'Livraison introuvable',
         })
       }
 
-      // Vérifier que la livraison appartient bien au client connecté
-      // Le client.id correspond à l'utilisateur.id (relation one-to-one)
+      // Vérifier que l'utilisateur est le client de la livraison
       if (livraison.clientId !== utilisateur.id) {
         return response.forbidden({
           success: false,
-          message: 'Accès non autorisé à cette livraison',
+          message: 'Vous ne pouvez pas payer pour cette livraison',
         })
       }
 
@@ -278,9 +278,10 @@ export default class StripeController {
         })
       }
 
-      // Créer le Payment Intent via le service
+      // Créer ou récupérer le client Stripe
       const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
 
+      // 🔒 ESCROW: Créer Payment Intent avec capture manuelle
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Number(amount),
         currency: 'eur',
@@ -294,7 +295,7 @@ export default class StripeController {
         capture_method: 'manual', // ESCROW: L'argent est bloqué jusqu'à validation
       })
 
-      // 🚀 MISE À JOUR DE LA LIVRAISON - STATUT AUTHORIZED (pending)
+      // 🚀 MISE À JOUR DE LA LIVRAISON - STATUT PENDING (authorized côté frontend)
       livraison.paymentStatus = 'pending' // authorized côté frontend
       livraison.paymentIntentId = paymentIntent.id
       livraison.amount = Number(amount) / 100 // Convertir centimes en euros
@@ -304,79 +305,17 @@ export default class StripeController {
         `✅ Livraison ${livraisonId} mise à jour: payment_status=pending, payment_intent_id=${paymentIntent.id}`
       )
 
-      if (livraison.livreurId) {
-        try {
-          console.log('💰 Ajout des fonds au portefeuille du livreur:', livraison.livreurId)
-          console.log('💰 Montant à ajouter (en euros):', Number(amount) / 100)
-
-          // Récupérer ou créer le portefeuille du livreur
-          const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
-          let portefeuille = await PortefeuilleEcodeli.default
-            .query()
-            .where('utilisateur_id', livraison.livreurId)
-            .where('is_active', true)
-            .first()
-
-          if (!portefeuille) {
-            console.log("📝 Création d'un nouveau portefeuille pour le livreur")
-            portefeuille = await PortefeuilleEcodeli.default.create({
-              utilisateurId: livraison.livreurId,
-              soldeDisponible: 0,
-              soldeEnAttente: 0,
-              isActive: true,
-            })
-          }
-
-          console.log('🔍 Portefeuille avant ajout:', {
-            id: portefeuille.id,
-            soldeDisponible: portefeuille.soldeDisponible,
-            soldeEnAttente: portefeuille.soldeEnAttente,
-          })
-
-          // Ajouter les fonds en attente
-          const montantEuros = Number(amount) / 100
-          await portefeuille.ajouterFondsEnAttente(montantEuros)
-
-          // Recharger le portefeuille pour voir les changements
-          await portefeuille.refresh()
-          console.log('✅ Portefeuille après ajout:', {
-            id: portefeuille.id,
-            soldeDisponible: portefeuille.soldeDisponible,
-            soldeEnAttente: portefeuille.soldeEnAttente,
-          })
-
-          // Enregistrer la transaction
-          const TransactionPortefeuille = await import('#models/transaction_portefeuille')
-          await TransactionPortefeuille.default.create({
-            portefeuilleId: portefeuille.id,
-            utilisateurId: livraison.livreurId,
-            typeTransaction: 'credit',
-            montant: montantEuros,
-            soldeAvant: Number.parseFloat(String(portefeuille.soldeDisponible)) || 0,
-            soldeApres: Number.parseFloat(String(portefeuille.soldeDisponible)) || 0, // Reste le même car en attente
-            description: `Paiement en escrow - Livraison #${livraisonId}`,
-            referenceExterne: paymentIntent.id,
-            statut: 'pending',
-            metadata: JSON.stringify({
-              livraisonId,
-              type: 'escrow_payment',
-              stripePaymentIntentId: paymentIntent.id,
-            }),
-          })
-
-          console.log('✅ Fonds ajoutés au portefeuille en attente du livreur')
-        } catch (walletError) {
-          console.error('⚠️ Erreur ajout fonds portefeuille (non bloquant):', walletError)
-          // Ne pas bloquer le paiement pour cette erreur
-        }
-      } else {
-        console.warn('⚠️ Pas de livreur assigné pour cette livraison')
-      }
+      // 🔧 CORRECTION MAJEURE : NE PAS AJOUTER LES FONDS AU PORTEFEUILLE MAINTENANT
+      // Les fonds ne seront ajoutés qu'après validation du code selon le cahier des charges
+      console.log('💰 ESCROW: Fonds bloqués chez Stripe, pas encore dans le portefeuille')
+      console.log('🔒 Les fonds seront libérés après validation du code de livraison')
 
       return response.ok({
         success: true,
         client_secret: paymentIntent.client_secret,
         payment_intent_id: paymentIntent.id,
+        message:
+          'Paiement créé en escrow - Les fonds seront libérés après validation de la livraison',
       })
     } catch (error) {
       console.error('❌ Erreur création paiement livraison:', error)
@@ -475,6 +414,54 @@ export default class StripeController {
    */
 
   /**
+   * 🔍 DEBUG: Liste toutes les factures Stripe pour vérification
+   */
+  async debugListInvoices({ response, auth }: HttpContext) {
+    try {
+      const utilisateur = auth.user as Utilisateurs
+
+      if (!utilisateur.stripeCustomerId) {
+        return response.ok({
+          success: false,
+          message: 'Utilisateur sans ID client Stripe',
+          invoices: [],
+        })
+      }
+
+      // Récupérer toutes les factures du client
+      const invoices = await stripe.invoices.list({
+        customer: utilisateur.stripeCustomerId,
+        limit: 10,
+      })
+
+      const formattedInvoices = invoices.data.map((invoice) => ({
+        id: invoice.id,
+        number: invoice.number,
+        description: invoice.description,
+        amount: invoice.amount_paid / 100,
+        currency: invoice.currency,
+        status: invoice.status,
+        pdf_url: invoice.invoice_pdf,
+        created: new Date(invoice.created * 1000).toISOString(),
+        metadata: invoice.metadata,
+      }))
+
+      return response.ok({
+        success: true,
+        customer_id: utilisateur.stripeCustomerId,
+        total_invoices: invoices.data.length,
+        invoices: formattedInvoices,
+      })
+    } catch (error) {
+      console.error('❌ Erreur debug factures:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la récupération des factures',
+      })
+    }
+  }
+
+  /**
    * Endpoint pour recevoir les webhooks Stripe
    */
   async webhook({ request, response }: HttpContext) {
@@ -498,6 +485,404 @@ export default class StripeController {
       console.error('❌ Erreur webhook:', error)
       return response.internalServerError({
         message: 'Erreur lors du traitement du webhook',
+      })
+    }
+  }
+
+  // ===============================================
+  // 🆕 SYSTÈME PAIEMENT CLIENT MULTI-RÔLES
+  // ===============================================
+
+  /**
+   * 💰 CRÉER PAIEMENT LIVRAISON AVEC OPTION CAGNOTTE
+   * Permet aux clients de choisir entre Stripe ou leur cagnotte
+   */
+  async createLivraisonPaymentWithWallet({ request, response, auth }: HttpContext) {
+    try {
+      const {
+        amount,
+        livraison_id: livraisonId,
+        description,
+        paymentMethod, // 'stripe' | 'wallet' | 'mixed'
+        walletAmount, // Montant à prendre sur la cagnotte (pour mixed)
+      } = request.only(['amount', 'livraison_id', 'description', 'paymentMethod', 'walletAmount'])
+
+      console.log('🚀 CRÉATION PAIEMENT LIVRAISON AVEC CAGNOTTE:', {
+        amount,
+        livraisonId,
+        paymentMethod,
+        walletAmount,
+      })
+
+      const utilisateur = await auth.authenticate()
+      if (!utilisateur) {
+        return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
+      }
+
+      // Vérifier que la livraison existe
+      const LivraisonModel = await import('#models/livraison')
+      const Livraison = LivraisonModel.default
+      const livraison = await Livraison.find(livraisonId)
+      if (!livraison) {
+        return response.badRequest({
+          success: false,
+          message: 'Livraison introuvable',
+        })
+      }
+
+      // Vérifier que l'utilisateur est le client de la livraison
+      if (livraison.clientId !== utilisateur.id) {
+        return response.forbidden({
+          success: false,
+          message: 'Vous ne pouvez pas payer pour cette livraison',
+        })
+      }
+
+      const totalAmount = Number(amount) / 100 // Convertir en euros
+
+      // Cas 1: Paiement entièrement depuis la cagnotte
+      if (paymentMethod === 'wallet') {
+        const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
+        const PortefeuilleModel = PortefeuilleEcodeli.default
+        const TransactionPortefeuille = await import('#models/transaction_portefeuille')
+        const TransactionModel = TransactionPortefeuille.default
+
+        // Récupérer le portefeuille
+        const portefeuille = await PortefeuilleModel.query()
+          .where('utilisateur_id', utilisateur.id)
+          .where('is_active', true)
+          .first()
+
+        if (!portefeuille) {
+          return response.badRequest({
+            success: false,
+            message: 'Portefeuille non trouvé',
+          })
+        }
+
+        // Vérifier le solde disponible
+        if (portefeuille.soldeDisponible < totalAmount) {
+          return response.badRequest({
+            success: false,
+            message: `Solde insuffisant. Disponible: ${portefeuille.soldeDisponible}€, Demandé: ${totalAmount}€`,
+          })
+        }
+
+        // Débiter le portefeuille
+        const ancienSolde = portefeuille.soldeDisponible
+        await portefeuille.retirerFonds(totalAmount)
+
+        // Enregistrer la transaction
+        await TransactionModel.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: utilisateur.id,
+          typeTransaction: 'debit',
+          montant: totalAmount,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: description || `Livraison #${livraisonId}`,
+          referenceExterne: livraisonId.toString(),
+          statut: 'completed',
+          metadata: JSON.stringify({
+            payment_method: 'wallet',
+            type: 'livraison',
+            reference_id: livraisonId.toString(),
+          }),
+        })
+
+        // Mettre à jour la livraison
+        livraison.paymentStatus = 'paid'
+        livraison.amount = totalAmount
+        await livraison.save()
+
+        return response.ok({
+          success: true,
+          message: 'Paiement effectué depuis la cagnotte',
+          paymentMethod: 'wallet',
+          data: {
+            montant_paye: totalAmount,
+            nouveau_solde: portefeuille.soldeDisponible,
+          },
+        })
+      }
+
+      // Cas 2: Paiement mixte (cagnotte + Stripe)
+      if (paymentMethod === 'mixed' && walletAmount) {
+        const walletAmountEuros = Number(walletAmount) / 100
+        const stripeAmountEuros = totalAmount - walletAmountEuros
+
+        if (stripeAmountEuros <= 0) {
+          return response.badRequest({
+            success: false,
+            message: 'Le montant Stripe doit être positif pour un paiement mixte',
+          })
+        }
+
+        // Débiter la cagnotte d'abord (logique similaire au cas wallet)
+        const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
+        const PortefeuilleModel = PortefeuilleEcodeli.default
+        const TransactionPortefeuille = await import('#models/transaction_portefeuille')
+        const TransactionModel = TransactionPortefeuille.default
+
+        const portefeuille = await PortefeuilleModel.query()
+          .where('utilisateur_id', utilisateur.id)
+          .where('is_active', true)
+          .first()
+
+        if (!portefeuille || portefeuille.soldeDisponible < walletAmountEuros) {
+          return response.badRequest({
+            success: false,
+            message: 'Solde cagnotte insuffisant pour le paiement mixte',
+          })
+        }
+
+        const ancienSolde = portefeuille.soldeDisponible
+        await portefeuille.retirerFonds(walletAmountEuros)
+
+        await TransactionModel.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: utilisateur.id,
+          typeTransaction: 'debit',
+          montant: walletAmountEuros,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: `Livraison #${livraisonId} (partie cagnotte)`,
+          referenceExterne: `${livraisonId}_wallet`,
+          statut: 'completed',
+          metadata: JSON.stringify({
+            payment_method: 'mixed_wallet',
+            type: 'livraison',
+          }),
+        })
+
+        // Créer le Payment Intent Stripe pour le reste
+        const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(stripeAmountEuros * 100), // Convertir en centimes
+          currency: 'eur',
+          customer: customerId,
+          description: `${description} (partie Stripe)`,
+          metadata: {
+            type: 'livraison_mixed',
+            utilisateur_id: utilisateur.id.toString(),
+            livraison_id: livraisonId.toString(),
+            wallet_amount: walletAmountEuros.toString(),
+            total_amount: totalAmount.toString(),
+          },
+          capture_method: 'manual',
+        })
+
+        return response.ok({
+          success: true,
+          paymentMethod: 'mixed',
+          client_secret: paymentIntent.client_secret,
+          payment_intent_id: paymentIntent.id,
+          wallet_amount: walletAmountEuros,
+          stripe_amount: stripeAmountEuros,
+          message: `Paiement mixte: ${walletAmountEuros}€ depuis la cagnotte, ${stripeAmountEuros}€ par carte`,
+        })
+      }
+
+      // Cas 3: Paiement entièrement par Stripe (méthode existante)
+      const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Number(amount),
+        currency: 'eur',
+        customer: customerId,
+        description: String(description),
+        metadata: {
+          type: 'livraison',
+          utilisateur_id: utilisateur.id.toString(),
+          livraison_id: livraisonId.toString(),
+        },
+        capture_method: 'manual',
+      })
+
+      livraison.paymentStatus = 'pending'
+      livraison.paymentIntentId = paymentIntent.id
+      livraison.amount = totalAmount
+      await livraison.save()
+
+      return response.ok({
+        success: true,
+        paymentMethod: 'stripe',
+        client_secret: paymentIntent.client_secret,
+        payment_intent_id: paymentIntent.id,
+        message: 'Paiement Stripe créé en escrow',
+      })
+    } catch (error) {
+      console.error('❌ Erreur création paiement livraison avec cagnotte:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la création du paiement',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * 🔧 CRÉER PAIEMENT SERVICE AVEC OPTION CAGNOTTE
+   * Pour les services proposés par les prestataires clients
+   */
+  async createServicePaymentWithWallet({ request, response, auth }: HttpContext) {
+    try {
+      const {
+        amount,
+        service_id: serviceId,
+        description,
+        paymentMethod,
+        walletAmount,
+      } = request.only(['amount', 'service_id', 'description', 'paymentMethod', 'walletAmount'])
+
+      const utilisateur = await auth.authenticate()
+      if (!utilisateur) {
+        return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
+      }
+
+      // Vérifier que le service existe
+      const ServiceModel = await import('#models/service')
+      const Service = ServiceModel.default
+      const service = await Service.find(serviceId)
+      if (!service) {
+        return response.badRequest({
+          success: false,
+          message: 'Service introuvable',
+        })
+      }
+
+      const totalAmount = Number(amount) / 100
+
+      // Paiement depuis la cagnotte
+      if (paymentMethod === 'wallet') {
+        const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
+        const PortefeuilleModel = PortefeuilleEcodeli.default
+        const TransactionPortefeuille = await import('#models/transaction_portefeuille')
+        const TransactionModel = TransactionPortefeuille.default
+
+        const portefeuille = await PortefeuilleModel.query()
+          .where('utilisateur_id', utilisateur.id)
+          .where('is_active', true)
+          .first()
+
+        if (!portefeuille) {
+          return response.badRequest({
+            success: false,
+            message: 'Portefeuille non trouvé',
+          })
+        }
+
+        if (portefeuille.soldeDisponible < totalAmount) {
+          return response.badRequest({
+            success: false,
+            message: `Solde insuffisant. Disponible: ${portefeuille.soldeDisponible}€, Demandé: ${totalAmount}€`,
+          })
+        }
+
+        const ancienSolde = portefeuille.soldeDisponible
+        await portefeuille.retirerFonds(totalAmount)
+
+        await TransactionModel.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: utilisateur.id,
+          typeTransaction: 'debit',
+          montant: totalAmount,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: description || `Service #${serviceId}`,
+          referenceExterne: serviceId.toString(),
+          statut: 'completed',
+          metadata: JSON.stringify({
+            payment_method: 'wallet',
+            type: 'service',
+            reference_id: serviceId.toString(),
+          }),
+        })
+
+        // Mettre à jour le service
+        service.status = 'paid'
+        await service.save()
+
+        return response.ok({
+          success: true,
+          message: 'Paiement service effectué depuis la cagnotte',
+          paymentMethod: 'wallet',
+          data: {
+            montant_paye: totalAmount,
+            nouveau_solde: portefeuille.soldeDisponible,
+          },
+        })
+      }
+
+      // Paiement Stripe standard
+      const paymentIntent = await StripeService.createServicePayment(
+        utilisateur,
+        Number(amount),
+        serviceId,
+        description
+      )
+
+      return response.ok({
+        success: true,
+        paymentMethod: 'stripe',
+        client_secret: paymentIntent.client_secret,
+        payment_intent_id: paymentIntent.id,
+      })
+    } catch (error) {
+      console.error('❌ Erreur création paiement service avec cagnotte:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la création du paiement service',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * 📊 OBTENIR SOLDE CAGNOTTE CLIENT
+   * Pour afficher le solde disponible dans l'interface de paiement
+   */
+  async getClientWalletBalance({ response, auth }: HttpContext) {
+    try {
+      const utilisateur = await auth.authenticate()
+      if (!utilisateur) {
+        return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
+      }
+
+      const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
+      const PortefeuilleModel = PortefeuilleEcodeli.default
+
+      const portefeuille = await PortefeuilleModel.query()
+        .where('utilisateur_id', utilisateur.id)
+        .where('is_active', true)
+        .first()
+
+      if (!portefeuille) {
+        return response.ok({
+          success: true,
+          data: {
+            solde_disponible: 0,
+            solde_en_attente: 0,
+            solde_total: 0,
+            has_wallet: false,
+          },
+        })
+      }
+
+      return response.ok({
+        success: true,
+        data: {
+          solde_disponible: portefeuille.soldeDisponible,
+          solde_en_attente: portefeuille.soldeEnAttente,
+          solde_total: portefeuille.soldeTotal,
+          has_wallet: true,
+        },
+      })
+    } catch (error) {
+      console.error('❌ Erreur récupération solde cagnotte:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erreur lors de la récupération du solde',
+        error: error.message,
       })
     }
   }
