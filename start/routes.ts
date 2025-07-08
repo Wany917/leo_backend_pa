@@ -182,7 +182,9 @@ router
   .group(() => {
     router.get('/', [AnnonceController, 'getAllAnnonces'])
     router.post('create', [AnnonceController, 'create'])
-    router.post(':id/livraisons', [LivraisonController, 'create'])
+    router.post('/annonces/:id/livraisons', [LivraisonController, 'create'])
+    // Annulation d’une livraison par le livreur
+    router.post('/livraisons/:id/cancel', [LivraisonController, 'cancel'])
     router.get(':id/livraisons', [LivraisonController, 'getAnnounceLivraisons'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])

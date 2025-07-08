@@ -1,5 +1,6 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import Client from '#models/client'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
@@ -10,29 +11,29 @@ export default class extends BaseSeeder {
       return
     }
 
-    // ✅ CLIENTS BASÉS SUR LES UTILISATEURS CRÉÉS
-    const clients = [
-      {
-        id: 2, // Marie Dupont - Rivoli
-        loyalty_points: 150,
-        preferred_payment_method: 'carte_bancaire',
-      },
-      {
-        id: 3, // Jean Martin - Champs-Élysées
-        loyalty_points: 250,
-        preferred_payment_method: 'stripe',
-      },
-      {
-        id: 4, // Sophie Bernard - Opéra
-        loyalty_points: 50,
-        preferred_payment_method: 'carte_bancaire',
-      },
+    const emails = [
+      'emma.dubois@email-test.fr',
+      'antoine.martin@fakemail.fr',
+      'sophie.bernard@testmail.com',
+      'julien.leroy@fakemail.org',
+      'marie.dufour@email-test.com',
+      'lucas.moreau@testmail.org',
     ]
 
-    for (const clientData of clients) {
-      await Client.create(clientData)
+    let created = 0
+    for (const email of emails) {
+      const user = await Utilisateurs.findBy('email', email)
+      if (!user) continue
+
+      await Client.create({
+        id: user.id,
+        loyalty_points: Math.floor(Math.random() * 300),
+        preferred_payment_method: 'carte_bancaire',
+      })
+      created++
+      console.log(`✅ Profil client créé pour ${email}`)
     }
 
-    console.log('✅ 3 clients créés avec des profils différents')
+    console.log(`✅ ${created} clients créés`)
   }
 }

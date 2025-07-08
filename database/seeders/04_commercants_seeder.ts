@@ -27,13 +27,13 @@ export default class extends BaseSeeder {
       {
         first_name: 'Nathalie',
         last_name: 'Sanchez',
-        email: 'contact@savons-marseille.fr',
+        email: 'contact@savons-paris.fr',
         password: '123456',
-        address: '12 cours Julien',
-        city: 'Marseille',
-        postalCode: '13006',
+        address: '12 rue de Turenne',
+        city: 'Paris',
+        postalCode: '75004',
         country: 'France',
-        phone_number: '+33491445566',
+        phone_number: '+33144776655',
         state: 'open',
       },
     ]
@@ -64,10 +64,10 @@ export default class extends BaseSeeder {
       },
       {
         id: createdUsers[1].id, // Nathalie Sanchez - ID automatique
-        store_name: 'Savons de Marseille Tradition',
-        business_address: '12 cours Julien, 13006 Marseille',
+        store_name: 'Savons de Paris Tradition',
+        business_address: '12 rue de Turenne, 75004 Paris',
         verification_state: 'pending',
-        contact_number: '+33491445566',
+        contact_number: '+33144776655',
         contract_start_date: new Date('2023-06-01'),
         contract_end_date: new Date('2024-06-01'),
         created_at: new Date(),
