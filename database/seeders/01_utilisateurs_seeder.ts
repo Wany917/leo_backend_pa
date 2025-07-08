@@ -1,5 +1,6 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import Utilisateurs from '#models/utilisateurs'
+// Le hachage sera appliqué automatiquement par le hook @beforeSave du modèle Utilisateurs
 
 export default class extends BaseSeeder {
   async run() {
@@ -10,166 +11,266 @@ export default class extends BaseSeeder {
       return
     }
 
-    // ✅ UTILISATEURS AVEC SCÉNARIOS LOGIQUES ET ADRESSES PARISIENNES RÉELLES
+    // ✅ UTILISATEURS ECODELI - DONNÉES RÉALISTES AVEC EMAILS FACTICES
     const users = [
       // =================================================================
-      // ADMINISTRATEURS
+      // 👨‍💼 ADMINISTRATEUR - Siège EcoDeli
       // =================================================================
       {
         first_name: 'Sylvain',
         last_name: 'Levy',
-        email: 'admin@ecodeli.fr',
+        email: 'sylvain.levy@ecodeli-test.fr', // Email factice
         password: '123456',
-        address: '110 rue de Flandre',
+        address: '110 rue de Flandre', // Siège réel EcoDeli selon cahier des charges
         city: 'Paris',
-        postalCode: '75019',
+        postal_code: '75019',
         country: 'France',
-        phone_number: '+33158423100',
+        phone_number: '+33142030000',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
 
       // =================================================================
-      // CLIENTS AVEC SCÉNARIOS DE TEST LOGIQUES
+      // 👥 CLIENTS - Utilisateurs finaux EcoDeli
       // =================================================================
       {
-        first_name: 'Marie',
-        last_name: 'Dupont',
-        email: 'marie.dupont@gmail.com',
+        first_name: 'Emma',
+        last_name: 'Dubois',
+        email: 'emma.dubois@email-test.fr',
         password: '123456',
-        address: '15 rue de Rivoli', // Près du Louvre
+        address: '45 Boulevard Richard-Lenoir',
         city: 'Paris',
-        postalCode: '75001',
+        postal_code: '75011',
         country: 'France',
-        phone_number: '+33612345678',
+        phone_number: '+33145232841',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
       {
-        first_name: 'Jean',
+        first_name: 'Antoine',
         last_name: 'Martin',
-        email: 'jean.martin@outlook.fr',
+        email: 'antoine.martin@fakemail.fr',
         password: '123456',
-        address: '25 avenue des Champs-Élysées', // Champs-Élysées
+        address: '23 Rue de Belleville',
         city: 'Paris',
-        postalCode: '75008',
+        postal_code: '75019',
         country: 'France',
-        phone_number: '+33623456789',
+        phone_number: '+33142589634',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: false, // Préfère emails
       },
       {
         first_name: 'Sophie',
         last_name: 'Bernard',
-        email: 'sophie.bernard@gmail.com',
+        email: 'sophie.bernard@testmail.com',
         password: '123456',
-        address: '42 rue de la Paix', // Opéra
+        address: '18 Avenue du Maine',
         city: 'Paris',
-        postalCode: '75002',
+        postal_code: '75015',
         country: 'France',
-        phone_number: '+33634567890',
+        phone_number: '+33145674523',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
-
-      // =================================================================
-      // LIVREURS AVEC ZONES DE COUVERTURE LOGIQUES
-      // =================================================================
       {
-        first_name: 'Ahmed',
-        last_name: 'Benali',
-        email: 'ahmed.benali@gmail.com',
+        first_name: 'Julien',
+        last_name: 'Leroy',
+        email: 'julien.leroy@fakemail.org',
         password: '123456',
-        address: '18 rue de Belleville', // Belleville - Zone Nord-Est
+        address: '34 Rue du Faubourg Saint-Martin',
         city: 'Paris',
-        postalCode: '75020',
+        postal_code: '75010',
         country: 'France',
-        phone_number: '+33645678901',
+        phone_number: '+33142678945',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
+      },
+      {
+        first_name: 'Marie',
+        last_name: 'Dufour',
+        email: 'marie.dufour@email-test.com',
+        password: '123456',
+        address: '8 Rue du Temple',
+        city: 'Paris',
+        postal_code: '75004',
+        country: 'France',
+        phone_number: '+33148562378',
+        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: false, // Notifications désactivées
+        email_notifications_enabled: true,
       },
       {
         first_name: 'Lucas',
-        last_name: 'Dubois',
-        email: 'lucas.dubois@gmail.com',
+        last_name: 'Moreau',
+        email: 'lucas.moreau@testmail.org',
         password: '123456',
-        address: '33 rue Saint-Germain', // Saint-Germain - Zone Sud
+        address: '12 Rue de la Roquette',
         city: 'Paris',
-        postalCode: '75006',
+        postal_code: '75011',
         country: 'France',
-        phone_number: '+33656789012',
+        phone_number: '+33143789652',
         state: 'open',
-      },
-      {
-        first_name: 'Fatima',
-        last_name: 'Alaoui',
-        email: 'fatima.alaoui@gmail.com',
-        password: '123456',
-        address: '8 rue de la République', // République - Zone Centre
-        city: 'Paris',
-        postalCode: '75011',
-        country: 'France',
-        phone_number: '+33667890123',
-        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
 
       // =================================================================
-      // PRESTATAIRES DE SERVICES
+      // 🚚 LIVREURS - Crowdshippers EcoDeli
+      // =================================================================
+      {
+        first_name: 'Pierre',
+        last_name: 'Durand',
+        email: 'pierre.durand@livreur-test.fr',
+        password: '123456',
+        address: '25 Rue Saint-Antoine',
+        city: 'Paris',
+        postal_code: '75004',
+        country: 'France',
+        phone_number: '+33145896741',
+        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
+      },
+      {
+        first_name: 'Julie',
+        last_name: 'Moreau',
+        email: 'julie.moreau@livreurfake.com',
+        password: '123456',
+        address: '67 Rue de Charonne',
+        city: 'Paris',
+        postal_code: '75011',
+        country: 'France',
+        phone_number: '+33142567893',
+        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
+      },
+      {
+        first_name: 'Alex',
+        last_name: 'Bernard',
+        email: 'alex.bernard@livreur-test.org',
+        password: '123456',
+        address: '89 Avenue de la République',
+        city: 'Paris',
+        postal_code: '75011',
+        country: 'France',
+        phone_number: '+33148567234',
+        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
+      },
+
+      // =================================================================
+      // 👩‍💼 PRESTATAIRES - Services à la personne
       // =================================================================
       {
         first_name: 'Isabelle',
-        last_name: 'Moreau',
-        email: 'isabelle.moreau@services.fr',
+        last_name: 'Cohen',
+        email: 'isabelle.cohen@prestafake.fr',
         password: '123456',
-        address: '55 rue de Rennes', // Montparnasse - Transport médical
+        address: '34 Rue de Turenne',
         city: 'Paris',
-        postalCode: '75006',
+        postal_code: '75003',
         country: 'France',
-        phone_number: '+33678901234',
+        phone_number: '+33142345678',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
       {
         first_name: 'Thomas',
-        last_name: 'Petit',
-        email: 'thomas.petit@menage.fr',
+        last_name: 'Roux',
+        email: 'thomas.roux@servicefake.com',
         password: '123456',
-        address: '12 place des Vosges', // Marais - Services ménagers
+        address: '56 Boulevard Voltaire',
         city: 'Paris',
-        postalCode: '75004',
+        postal_code: '75011',
         country: 'France',
-        phone_number: '+33689012345',
+        phone_number: '+33143456789',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
+      },
+      {
+        first_name: 'Sandra',
+        last_name: 'Petit',
+        email: 'sandra.petit@pretafake.org',
+        password: '123456',
+        address: '78 Rue de Rivoli',
+        city: 'Paris',
+        postal_code: '75001',
+        country: 'France',
+        phone_number: '+33144567890',
+        state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
 
       // =================================================================
-      // COMMERÇANTS
+      // 🏪 COMMERÇANTS - Partenaires EcoDeli
       // =================================================================
       {
-        first_name: 'François',
-        last_name: 'Leblanc',
-        email: 'contact@epicerie-montmartre.fr',
+        first_name: 'David',
+        last_name: 'Garcia',
+        email: 'david.garcia@commercant-test.fr',
         password: '123456',
-        address: '28 rue des Abbesses', // Montmartre
+        address: '90 Avenue des Champs-Élysées',
         city: 'Paris',
-        postalCode: '75018',
+        postal_code: '75008',
         country: 'France',
-        phone_number: '+33690123456',
+        phone_number: '+33145678901',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
       {
-        first_name: 'Nathalie',
-        last_name: 'Rousseau',
-        email: 'contact@patisserie-marais.fr',
+        first_name: 'Nadia',
+        last_name: 'Benali',
+        email: 'nadia.benali@commercantfake.com',
         password: '123456',
-        address: '16 rue des Rosiers', // Marais
+        address: '12 Place des Vosges',
         city: 'Paris',
-        postalCode: '75004',
+        postal_code: '75004',
         country: 'France',
-        phone_number: '+33601234567',
+        phone_number: '+33146789012',
         state: 'open',
+        preferred_language: 'fr',
+        push_notifications_enabled: true,
+        email_notifications_enabled: true,
       },
     ]
 
-    // Créer les utilisateurs
+    // ✅ CRÉER LES UTILISATEURS AVEC GESTION D'ERREURS
     for (const userData of users) {
-      await Utilisateurs.create(userData)
+      try {
+        await Utilisateurs.create(userData)
+        console.log(
+          `✅ Utilisateur créé: ${userData.first_name} ${userData.last_name} (${userData.email})`
+        )
+      } catch (error) {
+        console.log(`❌ Erreur création ${userData.email}:`, error.message)
+      }
     }
 
-    console.log('✅ 11 utilisateurs créés avec des adresses parisiennes logiques')
+    console.log(`✅ ${users.length} utilisateurs EcoDeli créés avec mots de passe hashés`)
   }
 }

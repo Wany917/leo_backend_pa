@@ -1,5 +1,6 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import Livreur from '#models/livreur'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
@@ -9,29 +10,26 @@ export default class extends BaseSeeder {
       console.log('Des livreurs existent déjà, seeder ignoré')
       return
     }
-
-    const livreurs = [
-      {
-        id: 5, // Ahmed Benali - Belleville (Zone Nord-Est)
-        availabilityStatus: 'available' as const,
-        rating: 4.8,
-      },
-      {
-        id: 6, // Lucas Dubois - Saint-Germain (Zone Sud)
-        availabilityStatus: 'available' as const,
-        rating: 4.6,
-      },
-      {
-        id: 7, // Fatima Alaoui - République (Zone Centre)
-        availabilityStatus: 'available' as const,
-        rating: 4.9,
-      },
+    const emails = [
+      'pierre.durand@livreur-test.fr',
+      'julie.moreau@livreurfake.com',
+      'alex.bernard@livreur-test.org',
     ]
 
-    for (const livreurData of livreurs) {
-      await Livreur.create(livreurData)
+    for (const email of emails) {
+      const user = await Utilisateurs.findBy('email', email)
+      if (user) {
+        await Livreur.create({
+          id: user.id,
+          disponible: true,
+          enService: false,
+        })
+        console.log(`✅ Profil livreur créé pour ${email} (id: ${user.id})`)
+      } else {
+        console.log(`❌ Utilisateur introuvable pour livreur: ${email}`)
+      }
     }
 
-    console.log('✅ 3 livreurs créés avec statuts et notes cohérents')
+    console.log('✅ Création des profils livreurs terminée')
   }
 }

@@ -12,11 +12,11 @@ export default class extends BaseSeeder {
     }
 
     // ✅ RÉCUPÉRER LES UTILISATEURS PAR EMAIL PLUTÔT QUE PAR ID FIXE
-    const marie = await Utilisateurs.findBy('email', 'marie.dupont@gmail.com')
-    const jean = await Utilisateurs.findBy('email', 'jean.martin@outlook.fr')
-    const ahmed = await Utilisateurs.findBy('email', 'ahmed.benali@gmail.com')
+    const emma = await Utilisateurs.findBy('email', 'emma.dubois@email-test.fr')
+    const antoine = await Utilisateurs.findBy('email', 'antoine.martin@fakemail.fr')
+    const pierre = await Utilisateurs.findBy('email', 'pierre.durand@livreur-test.fr')
 
-    if (!marie || !jean || !ahmed) {
+    if (!emma || !antoine || !pierre) {
       console.log('❌ Utilisateurs non trouvés pour les complaints, seeder ignoré')
       return
     }
@@ -28,54 +28,50 @@ export default class extends BaseSeeder {
     // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
     const complaints = [
       {
-        utilisateur_id: marie.id, // Marie Dupont - ID dynamique
-        subject: 'Colis endommagé',
-        description:
-          "Mon colis est arrivé endommagé avec des traces d'écrasement. Le contenu est intact mais l'emballage est abîmé.",
+        utilisateur_id: emma!.id,
+        subject: 'Emballage déchiré',
+        description: "Le colis est arrivé avec l'emballage partiellement déchiré, contenu intact.",
         status: 'open',
         priority: 'medium',
-        related_order_id: null, // Pas de référence fixe
+        related_order_id: null,
         image_path: null,
         admin_notes: null,
         created_at: now,
         updated_at: now,
       },
       {
-        utilisateur_id: marie.id, // Marie Dupont - ID dynamique
-        subject: 'Retard important de livraison',
-        description:
-          "Ma livraison était prévue hier et n'est toujours pas arrivée. Je n'ai reçu aucune information concernant ce retard.",
+        utilisateur_id: emma!.id,
+        subject: 'Retard de livraison',
+        description: "La livraison prévue hier n'est toujours pas arrivée.",
         status: 'in_progress',
         priority: 'high',
-        related_order_id: null, // Pas de référence fixe
+        related_order_id: null,
         image_path: null,
-        admin_notes: 'Livreur contacté, problème de véhicule signalé',
+        admin_notes: 'Livreur contacté',
         created_at: yesterday,
         updated_at: now,
       },
       {
-        utilisateur_id: jean.id, // Jean Martin - ID dynamique
-        subject: 'Facturation incorrecte',
-        description:
-          'Le montant facturé ne correspond pas au devis initial. Il y a une différence de 15€ sans explication.',
+        utilisateur_id: antoine!.id,
+        subject: 'Montant facturé incorrect',
+        description: 'Différence de 10€ par rapport au devis.',
         status: 'resolved',
         priority: 'medium',
-        related_order_id: null, // Pas de référence fixe
+        related_order_id: null,
         image_path: null,
-        admin_notes: 'Remboursement de la différence effectué',
+        admin_notes: 'Ajustement effectué',
         created_at: lastWeek,
         updated_at: yesterday,
       },
       {
-        utilisateur_id: ahmed.id, // Ahmed Benali - ID dynamique
-        subject: "Erreur d'adresse de livraison",
-        description:
-          "Mon colis a été livré à la mauvaise adresse. L'adresse inscrite était correcte mais le livreur s'est trompé.",
+        utilisateur_id: pierre!.id,
+        subject: 'Mauvaise adresse de livraison',
+        description: 'Le colis a été livré à la mauvaise porte.',
         status: 'closed',
         priority: 'urgent',
-        related_order_id: null, // Pas de référence fixe
+        related_order_id: null,
         image_path: null,
-        admin_notes: 'Colis récupéré et livré à la bonne adresse avec compensation',
+        admin_notes: 'Colis récupéré et livré correctement',
         created_at: lastWeek,
         updated_at: yesterday,
       },

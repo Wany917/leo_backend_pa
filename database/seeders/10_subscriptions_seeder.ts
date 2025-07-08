@@ -18,7 +18,7 @@ export default class extends BaseSeeder {
     const isabelle = await Utilisateurs.findBy('email', 'isabelle.moreau@gmail.com')
     const thomas = await Utilisateurs.findBy('email', 'thomas.petit@services.fr')
     const francois = await Utilisateurs.findBy('email', 'contact@epiceriefine-paris.fr')
-    const nathalie = await Utilisateurs.findBy('email', 'contact@savons-marseille.fr')
+    const nathalie = await Utilisateurs.findBy('email', 'contact@savons-paris.fr')
 
     const subscriptions = []
 

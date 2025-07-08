@@ -50,6 +50,21 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
   @column()
   declare email: string
 
+  @column()
+  declare preferred_language: string | null
+
+  @column()
+  declare onesignal_player_id: string | null
+
+  @column()
+  declare push_notifications_enabled: boolean
+
+  @column()
+  declare email_notifications_enabled: boolean
+
+  @column()
+  declare notification_preferences: any | null
+
   @column({ serializeAs: null })
   declare password: string
 

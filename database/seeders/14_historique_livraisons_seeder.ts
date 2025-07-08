@@ -19,7 +19,7 @@ export default class extends BaseSeeder {
       {
         livraison_id: 4,
         status: 'in_progress',
-        remarks: 'En transit - Arrivée prévue à Marseille dans 3h',
+        remarks: 'En transit - Arrivée prévue à Nation dans 30 min',
         update_time: new Date('2025-01-05 14:00:00'),
       },
       {

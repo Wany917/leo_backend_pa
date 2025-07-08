@@ -1,5 +1,6 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import Admin from '#models/admin'
+import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
@@ -11,11 +12,15 @@ export default class extends BaseSeeder {
     }
 
     // ✅ ADMIN BASÉ SUR L'UTILISATEUR SYLVAIN LEVY (ID 1)
-    await Admin.create({
-      id: 1, // Correspond à l'utilisateur Sylvain Levy
-      privileges: 'super_admin',
-    })
-
-    console.log('✅ Admin Sylvain Levy créé (id: 1)')
+    const sylvain = await Utilisateurs.findBy('email', 'sylvain.levy@ecodeli-test.fr')
+    if (sylvain) {
+      await Admin.create({
+        id: sylvain.id,
+        privileges: 'super_admin',
+      })
+      console.log(`✅ Admin créé pour Sylvain Levy (id: ${sylvain.id})`)
+    } else {
+      console.log('❌ Utilisateur Sylvain Levy introuvable, admin non créé')
+    }
   }
 }
