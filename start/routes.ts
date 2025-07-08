@@ -171,8 +171,18 @@ router
       .group(() => {
         router.post('/', [ShopkeeperDeliveriesController, 'create'])
         router.get('/', [ShopkeeperDeliveriesController, 'getForShopkeeper'])
+        router.delete('/:id', [ShopkeeperDeliveriesController, 'delete'])
       })
       .prefix('deliveries')
+
+    // Warehouse Routes for Shopkeepers
+    router
+      .group(() => {
+        router.get('/', [WharehousesController, 'getAllWharehouses'])
+        router.get('/:id', [WharehousesController, 'getWharehouse'])
+        router.get('/:id/capacity', [WharehousesController, 'getAvailableCapacity'])
+      })
+      .prefix('warehouses')
   })
   .prefix('commercants')
   .use(middleware.auth())
@@ -187,6 +197,7 @@ router
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
     router.put(':id', [AnnonceController, 'updateAnnonce'])
     router.put(':id/with-string-dates', [AnnonceController, 'updateAnnonceWithStringDates'])
+    router.delete(':id', [AnnonceController, 'delete']).use(middleware.auth())
     router.post(':id/services', [AnnonceServicesController, 'attachServices'])
     router.delete(':id/services', [AnnonceServicesController, 'detachServices'])
     router.get(':id/services', [AnnonceServicesController, 'getServices'])
@@ -266,6 +277,22 @@ router
     router.get('/', [AdminController, 'index']).use(middleware.auth())
     router.post('/', [AdminController, 'create']).use(middleware.auth())
     router.post('create-user', [AdminController, 'createUserWithEmail']).use(middleware.auth())
+
+    // Gestion des livraisons de commerçants - AVANT les routes avec :id
+    router
+      .get('shopkeeper-deliveries', [ShopkeeperDeliveriesController, 'getAllForAdmin'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Route de suppression des livraisons de commerçants pour les admins
+    router
+      .delete('shopkeeper-deliveries/:id', [ShopkeeperDeliveriesController, 'deleteForAdmin'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Gestion des annonces admin avec informations utilisateur complètes
+    router
+      .get('annonces', [AnnonceController, 'getAdminAnnonces'])
+      .use([middleware.auth(), middleware.admin()])
+
     router.get(':id', [AdminController, 'get']).use(middleware.auth())
     router.put(':id', [AdminController, 'update']).use(middleware.auth())
     router.delete(':id', [AdminController, 'delete']).use(middleware.auth())
@@ -274,11 +301,6 @@ router
       .use(middleware.auth())
     router.delete('delete-user/:id', [AdminController, 'deleteUser']).use(middleware.auth())
 
-    // ==============================
-    // ROUTES SERVICES ADMIN - FONCTIONNELLES
-    // ==============================
-
-    // Dashboard et analytics services
     router
       .get('services/dashboard', [AdminController, 'getServicesDashboard'])
       .use(middleware.auth())

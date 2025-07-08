@@ -18,6 +18,8 @@ export default class ShopkeeperDeliveriesController {
       const commercant = await auth.authenticate()
       const payload = await request.validateUsing(shopkeeperDeliveryValidator)
 
+      console.log('📦 Payload reçu:', payload)
+
       // 1. Générer un numéro de suivi unique pour le colis
       const trackingNumber = `ECO-SHOP-${cuid()}`
 
@@ -34,6 +36,8 @@ export default class ShopkeeperDeliveriesController {
         status: 'pending_acceptance',
       })
 
+      console.log('✅ Demande de livraison créée:', deliveryRequest.serialize())
+
       // 3. Créer le colis associé (sans annonce pour ce workflow)
       await Colis.create({
         annonceId: null,
@@ -46,14 +50,34 @@ export default class ShopkeeperDeliveriesController {
         status: 'stored',
       })
 
+      console.log('✅ Colis créé avec tracking:', trackingNumber)
+
       // 4. Notifier les livreurs via WebSocket
       if (Ws.io) {
         Ws.io.emit('new_shopkeeper_delivery', deliveryRequest)
+        console.log('📡 Notification WebSocket envoyée')
+      }
+
+      // 5. Log des champs additionnels pour debug (même s'ils ne sont pas stockés en DB pour l'instant)
+      if (payload.customer_phone) {
+        console.log('📞 Téléphone client:', payload.customer_phone)
+      }
+      if (payload.delivery_type) {
+        console.log('🚚 Type de livraison:', payload.delivery_type)
+      }
+      if (payload.starting_point) {
+        console.log('📍 Point de départ:', payload.starting_point)
+      }
+      if (payload.starting_type) {
+        console.log('🏠 Type de départ:', payload.starting_type)
+      }
+      if (payload.delivery_date) {
+        console.log('📅 Date souhaitée:', payload.delivery_date)
       }
 
       return response.created(deliveryRequest)
     } catch (error) {
-      console.error('Error creating shopkeeper delivery:', error)
+      console.error('❌ Error creating shopkeeper delivery:', error)
       return response.badRequest({
         message: 'Failed to create delivery request',
         error: error.messages || error.message,
@@ -280,5 +304,155 @@ export default class ShopkeeperDeliveriesController {
     }
 
     return response.ok(delivery)
+  }
+
+  /**
+   * ADMIN - Récupère toutes les livraisons de commerçants pour l'administration.
+   */
+  public async getAllForAdmin({ response }: HttpContext) {
+    try {
+      const deliveries = await db
+        .from('shopkeeper_deliveries')
+        .leftJoin(
+          'utilisateurs as commercant_user',
+          'shopkeeper_deliveries.commercant_id',
+          'commercant_user.id'
+        )
+        .leftJoin('commercants', 'commercant_user.id', 'commercants.id')
+        .leftJoin(
+          'utilisateurs as livreur_user',
+          'shopkeeper_deliveries.livreur_id',
+          'livreur_user.id'
+        )
+        .select(
+          'shopkeeper_deliveries.*',
+          'commercant_user.first_name as commercant_first_name',
+          'commercant_user.last_name as commercant_last_name',
+          'commercant_user.email as commercant_email',
+          'commercant_user.phone_number as commercant_phone',
+          'livreur_user.first_name as livreur_first_name',
+          'livreur_user.last_name as livreur_last_name',
+          'livreur_user.email as livreur_email',
+          'livreur_user.phone_number as livreur_phone'
+        )
+        .orderBy('shopkeeper_deliveries.created_at', 'desc')
+
+      console.log(`✅ Récupération de ${deliveries.length} livraisons de commerçants pour l'admin`)
+      return response.ok(deliveries)
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des livraisons admin:', error)
+      return response.badRequest({
+        message: 'Failed to fetch admin deliveries',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * ADMIN - Supprime une demande de livraison (accès administrateur).
+   * Les admins peuvent supprimer n'importe quelle livraison, peu importe son statut.
+   */
+  public async deleteForAdmin({ params, response }: HttpContext) {
+    try {
+      const deliveryRequest = await ShopkeeperDelivery.findOrFail(params.id)
+
+      console.log(`🗑️ Admin suppression de la livraison ${deliveryRequest.id}`)
+
+      // Supprimer le colis associé si il existe
+      const colis = await Colis.findBy('trackingNumber', deliveryRequest.trackingNumber)
+      if (colis) {
+        await colis.delete()
+        console.log(`✅ Colis ${deliveryRequest.trackingNumber} supprimé`)
+      }
+
+      // Supprimer la livraison associée si elle existe
+      if (deliveryRequest.livreurId) {
+        const livraison = await Livraison.query()
+          .where('dropoffLocation', deliveryRequest.customerAddress)
+          .where('livreurId', deliveryRequest.livreurId)
+          .first()
+        if (livraison) {
+          await livraison.delete()
+          console.log(`✅ Livraison associée supprimée`)
+        }
+      }
+
+      // Supprimer les codes temporaires associés
+      await CodeTemporaire.query().where('user_info', deliveryRequest.trackingNumber).delete()
+
+      // Supprimer la demande de livraison
+      await deliveryRequest.delete()
+      console.log(`✅ Demande de livraison ${deliveryRequest.id} supprimée par admin`)
+
+      // Notifier les livreurs via WebSocket que la demande n'est plus disponible
+      if (Ws.io) {
+        Ws.io.emit('shopkeeper_delivery_deleted', { deliveryId: deliveryRequest.id })
+        console.log('📡 Notification WebSocket de suppression envoyée')
+      }
+
+      return response.ok({
+        message: 'Delivery request successfully deleted by admin.',
+        deletedId: deliveryRequest.id,
+      })
+    } catch (error) {
+      console.error('❌ Error deleting shopkeeper delivery (admin):', error)
+      return response.badRequest({
+        message: 'Failed to delete delivery request',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Supprime une demande de livraison créée par le commerçant.
+   * Seules les livraisons en attente d'acceptation peuvent être supprimées.
+   */
+  public async delete({ params, auth, response }: HttpContext) {
+    try {
+      const commercant = await auth.authenticate()
+      const deliveryRequest = await ShopkeeperDelivery.findOrFail(params.id)
+
+      // Vérifier que le commerçant est bien le propriétaire de la demande
+      if (deliveryRequest.commercantId !== commercant.id) {
+        return response.forbidden({
+          message: 'You can only delete your own delivery requests.',
+        })
+      }
+
+      // Vérifier que la livraison n'a pas encore été acceptée
+      if (deliveryRequest.status !== 'pending_acceptance') {
+        return response.badRequest({
+          message: 'Only pending delivery requests can be deleted.',
+        })
+      }
+
+      // Supprimer le colis associé si il existe
+      const colis = await Colis.findBy('trackingNumber', deliveryRequest.trackingNumber)
+      if (colis) {
+        await colis.delete()
+        console.log(`✅ Colis ${deliveryRequest.trackingNumber} supprimé`)
+      }
+
+      // Supprimer la demande de livraison
+      await deliveryRequest.delete()
+      console.log(`✅ Demande de livraison ${deliveryRequest.id} supprimée`)
+
+      // Notifier les livreurs via WebSocket que la demande n'est plus disponible
+      if (Ws.io) {
+        Ws.io.emit('shopkeeper_delivery_deleted', { deliveryId: deliveryRequest.id })
+        console.log('📡 Notification WebSocket de suppression envoyée')
+      }
+
+      return response.ok({
+        message: 'Delivery request successfully deleted.',
+        deletedId: deliveryRequest.id,
+      })
+    } catch (error) {
+      console.error('❌ Error deleting shopkeeper delivery:', error)
+      return response.badRequest({
+        message: 'Failed to delete delivery request',
+        error: error.message,
+      })
+    }
   }
 }

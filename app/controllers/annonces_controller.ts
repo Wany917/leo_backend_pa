@@ -19,6 +19,155 @@ export default class AnnoncesController {
   }
 
   /**
+   * @tag Annonces - Admin
+   * @summary Lister toutes les annonces pour le back-office
+   * @description Récupère toutes les annonces avec filtres de recherche, pagination et informations utilisateur
+   */
+  async getAdminAnnonces({ request, response }: HttpContext) {
+    try {
+      const page = request.input('page', 1)
+      const limit = request.input('limit', 20)
+      const search = request.input('search', '')
+      const type = request.input('type', '')
+      const status = request.input('status', '')
+      const userType = request.input('user_type', '') // 'livreur', 'commercant', ou ''
+
+      // Construction de la requête avec joins
+      let query = db
+        .from('annonces')
+        .select(
+          'annonces.*',
+          'utilisateurs.first_name',
+          'utilisateurs.last_name',
+          'utilisateurs.email',
+          'utilisateurs.city',
+          'livreurs.id as is_livreur',
+          'commercants.id as is_commercant'
+        )
+        .join('utilisateurs', 'annonces.utilisateur_id', 'utilisateurs.id')
+        .leftJoin('livreurs', 'utilisateurs.id', 'livreurs.id')
+        .leftJoin('commercants', 'utilisateurs.id', 'commercants.id')
+        .orderBy('annonces.created_at', 'desc')
+
+      // Filtrage par recherche (titre, description, nom d'utilisateur)
+      if (search) {
+        query = query.where((builder) => {
+          builder
+            .whereILike('annonces.title', `%${search}%`)
+            .orWhereILike('annonces.description', `%${search}%`)
+            .orWhereILike('utilisateurs.first_name', `%${search}%`)
+            .orWhereILike('utilisateurs.last_name', `%${search}%`)
+            .orWhereILike('utilisateurs.email', `%${search}%`)
+        })
+      }
+
+      // Filtrage par type d'annonce
+      if (type) {
+        query = query.where('annonces.type', type)
+      }
+
+      // Filtrage par statut
+      if (status) {
+        query = query.where('annonces.status', status)
+      }
+
+      // Filtrage par type d'utilisateur
+      if (userType === 'livreur') {
+        query = query.whereNotNull('livreurs.id')
+      } else if (userType === 'commercant') {
+        query = query.whereNotNull('commercants.id')
+      }
+
+      // Pagination
+      const offset = (page - 1) * limit
+      const annonces = await query.limit(limit).offset(offset)
+
+      // Compter le total pour la pagination
+      let countQuery = db
+        .from('annonces')
+        .join('utilisateurs', 'annonces.utilisateur_id', 'utilisateurs.id')
+        .leftJoin('livreurs', 'utilisateurs.id', 'livreurs.id')
+        .leftJoin('commercants', 'utilisateurs.id', 'commercants.id')
+
+      // Appliquer les mêmes filtres pour le count
+      if (search) {
+        countQuery = countQuery.where((builder) => {
+          builder
+            .whereILike('annonces.title', `%${search}%`)
+            .orWhereILike('annonces.description', `%${search}%`)
+            .orWhereILike('utilisateurs.first_name', `%${search}%`)
+            .orWhereILike('utilisateurs.last_name', `%${search}%`)
+            .orWhereILike('utilisateurs.email', `%${search}%`)
+        })
+      }
+
+      if (type) {
+        countQuery = countQuery.where('annonces.type', type)
+      }
+
+      if (status) {
+        countQuery = countQuery.where('annonces.status', status)
+      }
+
+      if (userType === 'livreur') {
+        countQuery = countQuery.whereNotNull('livreurs.id')
+      } else if (userType === 'commercant') {
+        countQuery = countQuery.whereNotNull('commercants.id')
+      }
+
+      const total = await countQuery.count('* as count').first()
+
+      // Formatter les données pour le frontend
+      const formattedAnnonces = annonces.map((annonce) => ({
+        id: annonce.id,
+        title: annonce.title,
+        description: annonce.description,
+        price: annonce.price,
+        type: annonce.type,
+        status: annonce.status,
+        priority: annonce.priority,
+        startLocation: annonce.start_location,
+        endLocation: annonce.end_location,
+        desiredDate: annonce.desired_date,
+        actualDeliveryDate: annonce.actual_delivery_date,
+        insuranceAmount: annonce.insurance_amount,
+        createdAt: annonce.created_at,
+        updatedAt: annonce.updated_at,
+        user: {
+          id: annonce.utilisateur_id,
+          firstName: annonce.first_name,
+          lastName: annonce.last_name,
+          email: annonce.email,
+          city: annonce.city,
+          type: annonce.is_livreur ? 'livreur' : annonce.is_commercant ? 'commercant' : 'client',
+        },
+      }))
+
+      return response.ok({
+        annonces: formattedAnnonces,
+        pagination: {
+          page: page,
+          limit: limit,
+          total: total?.count || 0,
+          totalPages: Math.ceil((total?.count || 0) / limit),
+        },
+        filters: {
+          search,
+          type,
+          status,
+          userType,
+        },
+      })
+    } catch (error) {
+      console.error('Error fetching admin annonces:', error)
+      return response.status(500).send({
+        error: error.message,
+        detail: error.detail || 'Une erreur est survenue lors de la récupération des annonces',
+      })
+    }
+  }
+
+  /**
    * @tag Annonces - CRUD
    * @summary Créer une nouvelle annonce
    * @description Crée une annonce avec upload d'image optionnel
@@ -297,6 +446,72 @@ export default class AnnoncesController {
       return response.status(500).send({
         error: error.message,
         detail: error.detail || 'Unknown error occurred',
+      })
+    }
+  }
+
+  /**
+   * @tag Annonces - CRUD
+   * @summary Supprimer une annonce
+   * @description Supprime une annonce existante avec vérifications de sécurité
+   */
+  async delete({ request, response, auth }: HttpContext) {
+    try {
+      const annonceId = request.param('id')
+      const user = await auth.authenticate()
+
+      // Récupérer l'annonce avec l'utilisateur
+      const annonce = await Annonce.query()
+        .where('id', annonceId)
+        .preload('utilisateur' as ExtractModelRelations<Annonce>)
+        .first()
+
+      if (!annonce) {
+        return response.status(404).send({
+          error: 'Annonce non trouvée',
+        })
+      }
+
+      // Vérifier que l'utilisateur est propriétaire de l'annonce
+      if (annonce.utilisateurId !== user.id) {
+        return response.status(403).send({
+          error: "Vous n'êtes pas autorisé à supprimer cette annonce",
+        })
+      }
+
+      // Vérifier que l'annonce peut être supprimée (pas de livraisons en cours)
+      const livraisons = await db
+        .from('livraisons')
+        .join('livraison_colis', 'livraisons.id', '=', 'livraison_colis.livraison_id')
+        .join('colis', 'livraison_colis.colis_id', '=', 'colis.id')
+        .where('colis.annonce_id', annonceId)
+        .whereIn('livraisons.status', ['scheduled', 'in_progress'])
+
+      if (livraisons.length > 0) {
+        return response.status(400).send({
+          error: 'Impossible de supprimer cette annonce car elle a des livraisons en cours',
+          livraisons_actives: livraisons.length,
+        })
+      }
+
+      // Supprimer les colis associés
+      await db.from('colis').where('annonce_id', annonceId).delete()
+
+      // Supprimer les relations annonce-services
+      await db.from('annonce_services').where('annonce_id', annonceId).delete()
+
+      // Supprimer l'annonce
+      await annonce.delete()
+
+      return response.ok({
+        message: 'Annonce supprimée avec succès',
+        deleted_annonce_id: annonceId,
+      })
+    } catch (error) {
+      console.error('Error deleting annonce:', error)
+      return response.status(500).send({
+        error: "Erreur lors de la suppression de l'annonce",
+        details: error.message,
       })
     }
   }
