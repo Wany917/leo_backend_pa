@@ -33,6 +33,7 @@ const JustificationPiecesController = () => import('#controllers/justification_p
 const TrackingController = () => import('#controllers/tracking_controller')
 const SubscriptionsController = () => import('#controllers/subscriptions_controller')
 const FilesController = () => import('#controllers/files_controller')
+const BookingsController = () => import('#controllers/bookings_controller')
 const PortefeuilleController = () => import('#controllers/portefeuille_controller')
 const StripeController = () => import('#controllers/stripe_controller')
 const StripeConnectController = () => import('#controllers/stripe_connect_controller')
@@ -129,6 +130,7 @@ router
     router.post('add', [PrestataireController, 'add'])
     router.get(':id', [PrestataireController, 'getProfile'])
     router.put(':id', [PrestataireController, 'updateProfile'])
+    router.get(':id/reviews', [PrestataireController, 'getReviews']).use(middleware.auth())
   })
   .prefix('prestataires')
 
@@ -285,22 +287,21 @@ router
   .group(() => {
     router.get('/', [ServicesController, 'index'])
     router.post('/', [ServicesController, 'create'])
+
+    // Routes pour la validation des services (admin) - AVANT les routes avec :id
+    router
+      .get('pending', [ServicesController, 'getPendingServices'])
+      .use([middleware.auth(), middleware.admin()])
+    router
+      .post(':id/validate', [ServicesController, 'validateService'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Routes avec paramètres - APRÈS les routes spécifiques
     router.get(':id', [ServicesController, 'show'])
     router.put(':id', [ServicesController, 'update'])
     router.delete(':id', [ServicesController, 'delete'])
   })
   .prefix('services')
-
-router
-  .group(() => {
-    router.get('/', [ServiceTypesController, 'index'])
-    router.post('/', [ServiceTypesController, 'store'])
-    router.put(':id/toggle-status', [ServiceTypesController, 'toggleStatus'])
-    router.get(':id', [ServiceTypesController, 'show'])
-    router.put(':id', [ServiceTypesController, 'update'])
-    router.delete(':id', [ServiceTypesController, 'destroy'])
-  })
-  .prefix('service-types')
 
 router
   .group(() => {
@@ -435,6 +436,43 @@ router
     })
   })
   .prefix('map')
+
+// Routes pour les bookings
+router
+  .group(() => {
+    // Routes publiques/CRUD basiques
+    router.get('/', [BookingsController, 'index']).use(middleware.auth())
+    router.post('/', [BookingsController, 'create']).use(middleware.auth())
+    router.get(':id', [BookingsController, 'show']).use(middleware.auth())
+    router.put(':id/status', [BookingsController, 'updateStatus']).use(middleware.auth())
+
+    // Routes par client
+    router.get('client/:clientId', [BookingsController, 'getClientBookings']).use(middleware.auth())
+
+    // Routes par prestataire
+    router
+      .get('provider/:prestataireId', [BookingsController, 'getProviderBookings'])
+      .use(middleware.auth())
+
+    // Statistiques admin
+    router
+      .get('admin/stats', [BookingsController, 'getBookingStats'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('bookings')
+
+// Routes pour les types de services
+router
+  .group(() => {
+    router.get('/', [ServiceTypesController, 'index'])
+    router.post('/', [ServiceTypesController, 'create']).use(middleware.auth())
+    router.get('stats', [ServiceTypesController, 'getStats']).use(middleware.auth())
+    router.get(':id', [ServiceTypesController, 'show'])
+    router.put(':id', [ServiceTypesController, 'update']).use(middleware.auth())
+    router.put(':id/toggle-status', [ServiceTypesController, 'toggleStatus']).use(middleware.auth())
+    router.delete(':id', [ServiceTypesController, 'destroy']).use(middleware.auth())
+  })
+  .prefix('service-types')
 
 // ===============================================
 // ROUTES PORTEFEUILLE ECODELI

@@ -20,11 +20,11 @@ export default class extends BaseSchema {
         .onDelete('CASCADE')
       table.enum('rating_type', ['delivery', 'service', 'product']).notNullable()
       table.integer('rating_for_id').unsigned().notNullable() // ID de la livraison, service ou produit
-      table.integer('overall_rating').unsigned().notNullable() // 1-5
-      table.integer('punctuality_rating').unsigned().nullable() // Pour livraisons/services
-      table.integer('quality_rating').unsigned().nullable() // Pour services/produits
-      table.integer('communication_rating').unsigned().nullable() // Pour tous
-      table.integer('value_rating').unsigned().nullable() // Rapport qualité/prix
+      table.decimal('overall_rating', 3, 1).notNullable() // 1-5 avec 1 décimale (ex: 4.2)
+      table.decimal('punctuality_rating', 3, 1).nullable() // Pour livraisons/services
+      table.decimal('quality_rating', 3, 1).nullable() // Pour services/produits
+      table.decimal('communication_rating', 3, 1).nullable() // Pour tous
+      table.decimal('value_rating', 3, 1).nullable() // Rapport qualité/prix
       table.text('comment').nullable()
       table.boolean('is_verified_purchase').defaultTo(true)
       table.boolean('is_visible').defaultTo(true)

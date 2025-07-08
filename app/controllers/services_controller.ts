@@ -15,25 +15,46 @@ export default class ServicesController {
    * @summary Lister tous les services
    * @description Récupère la liste de tous les services avec prestataires et types
    */
-  async index({ response }: HttpContext) {
+  async index({ request, response }: HttpContext) {
     try {
-      const services = await Service.query()
+      const qs = request.qs()
+      const prestataireId = qs.prestataire_id
+
+      let query = Service.query()
         .preload('prestataire', (prestataireQuery) => {
           prestataireQuery.preload('user')
         })
-        .orderBy('name', 'asc')
+        .preload('serviceType')
+
+      // Filtrer par prestataire si spécifié
+      if (prestataireId) {
+        const prestataireIdNumber = Number.parseInt(prestataireId)
+        if (!Number.isNaN(prestataireIdNumber)) {
+          query = query.where('prestataireId', prestataireIdNumber)
+        }
+      }
+
+      const services = await query.orderBy('created_at', 'desc')
 
       return response.ok({
-        services: services.map((service) => ({
+        data: services.map((service) => ({
           ...service.serialize(),
-          prestataireNme:
+          prestataireName:
             service.prestataire?.user?.first_name + ' ' + service.prestataire?.user?.last_name,
           prestataireEmail: service.prestataire?.user?.email,
           prestataireRating: service.prestataire?.rating,
+          serviceTypeName: service.serviceType?.name || null,
+          service_type_name: service.serviceType?.name || null, // Alias pour le frontend
+          isActive: service.isActive, // Assurer que isActive est bien retourné
         })),
+        total: services.length,
+        prestataire_id: prestataireId || null,
       })
     } catch (error) {
-      return response.status(500).send({ error_message: 'Failed to fetch services', error })
+      console.error('Services index error:', error)
+      return response
+        .status(500)
+        .send({ error_message: 'Failed to fetch services', error: error.message })
     }
   }
 
@@ -48,60 +69,37 @@ export default class ServicesController {
         name,
         description,
         price,
+        pricing_type,
+        hourly_rate,
         service_type_id: serviceTypeId,
         prestataireId,
-        clientId,
         location,
-        start_date: startDate,
-        end_date: endDate,
         status,
+        duration,
+        availability_description,
+        home_service,
+        requires_materials,
       } = await request.validateUsing(serviceValidator)
 
-      // Validate and parse datetime fields
-      let parsedStartDate: DateTime | undefined
-      let parsedEndDate: DateTime | undefined
-
-      if (startDate) {
-        parsedStartDate = DateTime.fromISO(startDate)
-        if (!parsedStartDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid start_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: startDate,
-          })
-        }
-      }
-
-      if (endDate) {
-        parsedEndDate = DateTime.fromISO(endDate)
-        if (!parsedEndDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid end_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: endDate,
-          })
-        }
-      }
-
-      // Validate that end_date is after start_date
-      if (parsedStartDate && parsedEndDate && parsedEndDate <= parsedStartDate) {
+      // Validate required fields
+      if (!name || !description || price === undefined || price === null || !location) {
         return response.status(400).send({
-          error_message: 'End date must be after start date',
+          error_message: 'Missing required fields: name, description, price, location are required',
         })
       }
 
-      // Validate required fields
-      if (!name || !description || !price || !location || !startDate || !endDate) {
+      // Validate price is a valid number >= 0
+      if (Number.isNaN(price) || price < 0) {
+        return response.status(400).send({
+          error_message: 'Price must be a non-negative number',
+        })
+      }
+
+      // For hourly pricing, price can be 0 but hourly_rate must be > 0
+      if (pricing_type === 'hourly' && price === 0 && (!hourly_rate || hourly_rate <= 0)) {
         return response.status(400).send({
           error_message:
-            'Missing required fields: name, description, price, location, start_date, end_date are required',
-        })
-      }
-
-      // Validate price is a positive number
-      if (Number.isNaN(price) || price <= 0) {
-        return response.status(400).send({
-          error_message: 'Price must be a positive number',
+            'For hourly pricing, hourly_rate must be a positive number when price is 0',
         })
       }
 
@@ -112,25 +110,21 @@ export default class ServicesController {
         })
       }
 
-      // Validate clientId is a valid number if provided
-      if (clientId !== undefined && (Number.isNaN(clientId) || clientId <= 0)) {
-        return response.status(400).send({
-          error_message: 'clientId must be a valid positive number',
-        })
-      }
-
       const service = await Service.create({
         name,
         description,
         price: Number.parseFloat(price.toString()),
+        pricing_type: pricing_type || 'fixed',
+        hourly_rate: hourly_rate ? Number.parseFloat(hourly_rate.toString()) : null,
         service_type_id: serviceTypeId || null,
         prestataireId: prestataireId ? Number.parseInt(prestataireId.toString()) : undefined,
-        clientId: clientId ? Number.parseInt(clientId.toString()) : undefined,
         location,
-        start_date: parsedStartDate,
-        end_date: parsedEndDate,
-        status: status || 'scheduled',
-        isActive: true,
+        status: 'pending', // Nouveaux services sont toujours en attente de validation
+        duration: duration || null,
+        availability_description: availability_description || null,
+        home_service: home_service !== undefined ? home_service : true,
+        requires_materials: requires_materials !== undefined ? requires_materials : false,
+        isActive: false, // Inactif jusqu'à validation admin
       })
 
       return response.created({ service: service.serialize() })
@@ -162,7 +156,15 @@ export default class ServicesController {
   async show({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
-      const service = await Service.findOrFail(id)
+      const serviceId = Number.parseInt(id)
+
+      if (Number.isNaN(serviceId) || serviceId <= 0) {
+        return response.status(400).send({
+          error_message: 'Invalid service ID: must be a positive number',
+        })
+      }
+
+      const service = await Service.findOrFail(serviceId)
 
       return response.ok({ service: service.serialize() })
     } catch (error) {
@@ -176,54 +178,32 @@ export default class ServicesController {
   async update({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
+      const serviceId = Number.parseInt(id)
+
+      if (Number.isNaN(serviceId) || serviceId <= 0) {
+        return response.status(400).send({
+          error_message: 'Invalid service ID: must be a positive number',
+        })
+      }
+
       const {
         name,
         description,
         price,
         duration,
+        pricing_type,
+        hourly_rate,
         service_type_id,
         isActive,
         prestataireId,
         location,
-        start_date,
-        end_date,
         status,
+        availability_description,
+        home_service,
+        requires_materials,
       } = request.body()
 
-      const service = await Service.findOrFail(id)
-
-      // Validate and parse datetime fields if provided
-      let parsedStartDate: DateTime | undefined = service.start_date
-      let parsedEndDate: DateTime | undefined = service.end_date
-
-      if (start_date) {
-        parsedStartDate = DateTime.fromISO(start_date)
-        if (!parsedStartDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid start_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: start_date,
-          })
-        }
-      }
-
-      if (end_date) {
-        parsedEndDate = DateTime.fromISO(end_date)
-        if (!parsedEndDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid end_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: end_date,
-          })
-        }
-      }
-
-      // Validate that end_date is after start_date
-      if (parsedStartDate && parsedEndDate && parsedEndDate <= parsedStartDate) {
-        return response.status(400).send({
-          error_message: 'End date must be after start date',
-        })
-      }
+      const service = await Service.findOrFail(serviceId)
 
       // Validate price if provided
       if (price !== undefined && (Number.isNaN(price) || price <= 0)) {
@@ -243,14 +223,18 @@ export default class ServicesController {
         name: name || service.name,
         description: description || service.description,
         price: price ? Number.parseFloat(price) : service.price,
+        pricing_type: pricing_type || service.pricing_type,
+        hourly_rate: hourly_rate ? Number.parseFloat(hourly_rate) : service.hourly_rate,
         service_type_id: service_type_id !== undefined ? service_type_id : service.service_type_id,
         isActive: isActive !== undefined ? isActive : service.isActive,
         prestataireId: prestataireId ? Number.parseInt(prestataireId) : service.prestataireId,
         location: location || service.location,
-        start_date: parsedStartDate,
-        end_date: parsedEndDate,
         duration: duration !== undefined ? duration : service.duration,
         status: status || service.status,
+        availability_description: availability_description || service.availability_description,
+        home_service: home_service !== undefined ? home_service : service.home_service,
+        requires_materials:
+          requires_materials !== undefined ? requires_materials : service.requires_materials,
         updatedAt: DateTime.now(),
       })
 
@@ -286,15 +270,16 @@ export default class ServicesController {
   async delete({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
+      const serviceId = Number.parseInt(id)
 
       // Validate ID is a valid number
-      if (Number.isNaN(id) || id <= 0) {
+      if (Number.isNaN(serviceId) || serviceId <= 0) {
         return response.status(400).send({
           error_message: 'Invalid service ID: must be a positive number',
         })
       }
 
-      const service = await Service.findOrFail(id)
+      const service = await Service.findOrFail(serviceId)
 
       await service.delete()
 
@@ -345,7 +330,7 @@ export default class ServicesController {
       // Dans un vrai projet, utiliser une requête spatiale
       const services = await Service.query()
         .where('is_active', true)
-        .where('status', '!=', 'cancelled')
+        .where('status', 'available')
         .preload('prestataire', (prestataireQuery) => {
           prestataireQuery.preload('user')
         })
@@ -505,7 +490,11 @@ export default class ServicesController {
   async validateService({ request, response }: HttpContext) {
     try {
       const serviceId = request.param('id')
-      const { validation_status: validationStatus, admin_comments: adminComments } = request.body()
+      const {
+        validation_status: validationStatus,
+        admin_comments: adminComments,
+        require_justifications: requireJustifications = true,
+      } = request.body()
 
       if (!['approved', 'rejected', 'pending'].includes(validationStatus)) {
         return response.status(400).send({
@@ -515,15 +504,58 @@ export default class ServicesController {
 
       const service = await Service.findOrFail(serviceId)
 
-      // Mise à jour du statut
+      // Charger le prestataire et ses justificatifs
+      await service.load('prestataire', (prestataireQuery) => {
+        prestataireQuery.preload('user')
+      })
+
+      // Vérifier les justificatifs si nécessaire
+      if (requireJustifications && validationStatus === 'approved') {
+        const justifications = await db
+          .from('justification_pieces')
+          .where('utilisateur_id', service.prestataire?.user?.id)
+          .where('account_type', 'prestataire')
+          .where('verification_status', 'verified')
+
+        if (justifications.length === 0) {
+          return response.status(400).send({
+            error_message:
+              'Cannot approve service: No verified justifications found for this provider',
+            requires_justifications: true,
+            available_justifications: await db
+              .from('justification_pieces')
+              .where('utilisateur_id', service.prestataire?.user?.id)
+              .where('account_type', 'prestataire')
+              .select('id', 'document_type', 'verification_status'),
+          })
+        }
+      }
+
+      // Mise à jour du statut selon la validation
+      let newStatus: string
+      let isActive: boolean
+
+      switch (validationStatus) {
+        case 'approved':
+          newStatus = 'available'
+          isActive = true
+          break
+        case 'rejected':
+          newStatus = 'refused'
+          isActive = false
+          break
+        case 'pending':
+          newStatus = 'pending'
+          isActive = false
+          break
+        default:
+          newStatus = service.status
+          isActive = service.isActive
+      }
+
       service.merge({
-        status:
-          validationStatus === 'approved'
-            ? 'scheduled'
-            : validationStatus === 'rejected'
-              ? 'cancelled'
-              : service.status,
-        // Ajout d'un champ commentaire admin si nécessaire
+        status: newStatus,
+        isActive: isActive,
         updatedAt: DateTime.now(),
       })
 
@@ -533,11 +565,75 @@ export default class ServicesController {
         message: `Service ${validationStatus} successfully`,
         service: service.serialize(),
         admin_comments: adminComments || null,
+        justifications_verified: requireJustifications && validationStatus === 'approved',
       })
     } catch (error) {
       console.error('Service validation error:', error)
       return response.status(500).send({
         error_message: 'Failed to validate service',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * @tag Services - Admin
+   * @summary Services en attente de validation avec justificatifs
+   * @description Récupère tous les services en statut 'pending' avec leurs pièces justificatives
+   */
+  async getPendingServices({ response }: HttpContext) {
+    try {
+      const pendingServices = await Service.query()
+        .where('status', 'pending')
+        .preload('prestataire', (prestataireQuery) => {
+          prestataireQuery.preload('user')
+        })
+        .preload('serviceType')
+        .orderBy('created_at', 'desc')
+
+      // Récupérer les pièces justificatives pour chaque prestataire
+      const servicesWithJustifications = await Promise.all(
+        pendingServices.map(async (service) => {
+          const justifications = await db
+            .from('justification_pieces')
+            .where('utilisateur_id', service.prestataire?.user?.id)
+            .where('account_type', 'prestataire')
+            .orderBy('created_at', 'desc')
+
+          return {
+            ...service.serialize(),
+            prestataire_name: service.prestataire?.user
+              ? `${service.prestataire.user.first_name} ${service.prestataire.user.last_name}`
+              : 'Prestataire inconnu',
+            service_type_name: service.serviceType?.name || 'Type non défini',
+            prestataire_email: service.prestataire?.user?.email || 'Email non disponible',
+            justifications: justifications.map((justif) => ({
+              id: justif.id,
+              document_type: justif.document_type,
+              file_path: justif.file_path,
+              verification_status: justif.verification_status,
+              uploaded_at: justif.uploaded_at,
+              verified_at: justif.verified_at,
+            })),
+            has_verified_justifications: justifications.some(
+              (j) => j.verification_status === 'verified'
+            ),
+            total_justifications: justifications.length,
+            pending_justifications: justifications.filter(
+              (j) => j.verification_status === 'pending'
+            ).length,
+          }
+        })
+      )
+
+      return response.ok({
+        pending_services: servicesWithJustifications,
+        total_pending: pendingServices.length,
+      })
+    } catch (error) {
+      console.error('Get pending services error:', error)
+      return response.status(500).send({
+        error_message: 'Failed to fetch pending services',
         error: error.message,
       })
     }

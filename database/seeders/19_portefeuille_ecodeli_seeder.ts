@@ -21,10 +21,10 @@ export default class extends BaseSeeder {
         soldeDisponible: 89.75, // Anciens paiements libérés
         soldeEnAttente: 32.0, // Paiement des médicaments en attente de validation
         iban: 'FR76 1234 5678 9012 3456 789A',
-        virementAutomatique: true,
-        seuilVirement: 100.0,
+        bic: 'BNPAFRPP123',
+        virementAutoActif: true,
+        seuilVirementAuto: 100.0,
         isActive: true,
-        dernierVirement: new Date('2025-01-25T09:00:00'),
       },
 
       // =================================================================
@@ -36,10 +36,10 @@ export default class extends BaseSeeder {
         soldeDisponible: 156.25, // Anciens paiements libérés
         soldeEnAttente: 21.5, // Paiement en attente de validation par code
         iban: 'FR76 9876 5432 1098 7654 321B',
-        virementAutomatique: false,
-        seuilVirement: 150.0,
+        bic: 'BNPAFRPP456',
+        virementAutoActif: false,
+        seuilVirementAuto: 150.0,
         isActive: true,
-        dernierVirement: new Date('2025-01-20T14:30:00'),
       },
 
       // =================================================================
@@ -51,10 +51,10 @@ export default class extends BaseSeeder {
         soldeDisponible: 45.0, // Quelques paiements précédents
         soldeEnAttente: 0.0, // Aucun paiement en attente
         iban: 'FR76 1111 2222 3333 4444 555C',
-        virementAutomatique: true,
-        seuilVirement: 50.0,
+        bic: 'BNPAFRPP789',
+        virementAutoActif: true,
+        seuilVirementAuto: 50.0,
         isActive: true,
-        dernierVirement: null, // Jamais fait de virement
       },
     ]
 

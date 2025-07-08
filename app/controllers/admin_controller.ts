@@ -8,9 +8,9 @@ import Commercant from '#models/commercant'
 import Prestataire from '#models/prestataire'
 import Service from '#models/service'
 import ServiceType from '#models/service_type'
-import { adminValidator } from '#validators/admin'
+import { adminValidator, validatePrestataireValidator } from '#validators/admin'
 import { adminUserCreationValidator } from '#validators/admin_user_creation'
-import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
+
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 
@@ -22,7 +22,17 @@ export default class AdminController {
    */
   async index({ response }: HttpContext) {
     try {
-      const admins = await Admin.query().preload('user' as unknown as ExtractModelRelations<Admin>)
+      // Utiliser une requête JOIN au lieu de preload pour éviter les erreurs TypeScript
+      const admins = await db
+        .from('admins')
+        .join('utilisateurs', 'admins.id', 'utilisateurs.id')
+        .select(
+          'admins.*',
+          'utilisateurs.first_name',
+          'utilisateurs.last_name',
+          'utilisateurs.email',
+          'utilisateurs.state'
+        )
       return response.ok(admins)
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to fetch admins', error })
@@ -36,7 +46,7 @@ export default class AdminController {
    */
   async create({ request, response }: HttpContext) {
     try {
-      const { id, privileges } = await request.validateUsing(adminValidator)
+      const { id } = await request.validateUsing(adminValidator)
 
       // Vérifier si l'utilisateur existe
       const user = await Utilisateurs.find(id)
@@ -50,14 +60,27 @@ export default class AdminController {
         return response.status(400).send({ error_message: 'User is already an admin' })
       }
 
-      // Créer l'admin
+      // Créer l'admin avec privilège par défaut
       const admin = await Admin.create({
         id,
-        privileges: privileges || 'basic',
+        privileges: 'basic',
       })
 
-      await admin.load('user' as unknown as ExtractModelRelations<Admin>)
-      return response.created(admin)
+      // Récupérer les données complètes avec une requête JOIN
+      const adminWithUser = await db
+        .from('admins')
+        .join('utilisateurs', 'admins.id', 'utilisateurs.id')
+        .select(
+          'admins.*',
+          'utilisateurs.first_name',
+          'utilisateurs.last_name',
+          'utilisateurs.email',
+          'utilisateurs.state'
+        )
+        .where('admins.id', admin.id)
+        .first()
+
+      return response.created(adminWithUser)
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to create admin', error })
     }
@@ -158,26 +181,29 @@ export default class AdminController {
         preferred_payment_method: null,
       })
 
-      const fullUser = await Utilisateurs.query()
-        .where('id', user.id)
-        .preload('admin' as unknown as ExtractModelRelations<Utilisateurs>)
-        .firstOrFail()
+      // Récupérer les informations complètes de l'utilisateur créé
+      const fullUser = await db
+        .from('utilisateurs')
+        .leftJoin('admins', 'utilisateurs.id', 'admins.id')
+        .select('utilisateurs.*', 'admins.privileges')
+        .where('utilisateurs.id', user.id)
+        .first()
 
       return response.created({
         message: 'User created successfully',
         user: {
-          id: fullUser.id,
-          first_name: fullUser.first_name,
-          last_name: fullUser.last_name,
-          email: fullUser.email,
-          phone_number: fullUser.phone_number,
-          address: fullUser.address,
-          city: fullUser.city,
-          postalCode: fullUser.postalCode,
-          country: fullUser.country,
-          state: fullUser.state,
-          admin: fullUser.admin ? fullUser.admin.serialize() : null,
-          created_at: fullUser.createdAt,
+          id: fullUser?.id || user.id,
+          first_name: fullUser?.first_name || user.first_name,
+          last_name: fullUser?.last_name || user.last_name,
+          email: fullUser?.email || user.email,
+          phone_number: fullUser?.phone_number || user.phone_number,
+          address: fullUser?.address || user.address,
+          city: fullUser?.city || user.city,
+          postalCode: fullUser?.postalCode || user.postalCode,
+          country: fullUser?.country || user.country,
+          state: fullUser?.state || user.state,
+          admin: fullUser?.privileges ? { privileges: fullUser.privileges } : null,
+          created_at: fullUser?.createdAt || user.createdAt,
         },
       })
     } catch (error) {
@@ -191,10 +217,23 @@ export default class AdminController {
   async get({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
-      const admin = await Admin.query()
-        .where('id', id)
-        .preload('user' as unknown as ExtractModelRelations<Admin>)
-        .firstOrFail()
+      const admin = await db
+        .from('admins')
+        .join('utilisateurs', 'admins.id', 'utilisateurs.id')
+        .select(
+          'admins.*',
+          'utilisateurs.first_name',
+          'utilisateurs.last_name',
+          'utilisateurs.email',
+          'utilisateurs.state'
+        )
+        .where('admins.id', id)
+        .first()
+
+      if (!admin) {
+        return response.status(404).send({ error_message: 'Admin not found' })
+      }
+
       return response.ok(admin)
     } catch (error) {
       return response.status(404).send({ error_message: 'Admin not found' })
@@ -214,8 +253,21 @@ export default class AdminController {
       admin.privileges = privileges
       await admin.save()
 
-      await admin.load('user' as unknown as ExtractModelRelations<Admin>)
-      return response.ok(admin)
+      // Récupérer les données avec JOIN au lieu de preload
+      const adminWithUser = await db
+        .from('admins')
+        .join('utilisateurs', 'admins.id', 'utilisateurs.id')
+        .select(
+          'admins.*',
+          'utilisateurs.first_name',
+          'utilisateurs.last_name',
+          'utilisateurs.email',
+          'utilisateurs.state'
+        )
+        .where('admins.id', admin.id)
+        .first()
+
+      return response.ok(adminWithUser)
     } catch (error) {
       return response.status(500).send({ error_message: 'Failed to update admin', error })
     }
@@ -398,20 +450,13 @@ export default class AdminController {
         .groupBy('service_types.name')
         .orderBy('count', 'desc')
 
-      // Statistiques financières mensuelles
+      // Statistiques financières mensuelles (simplifiée)
       const monthlyRevenue = await db
         .from('services')
         .where('status', 'completed')
-        .select(
-          db.raw('EXTRACT(MONTH FROM start_date) as month'),
-          db.raw('EXTRACT(YEAR FROM start_date) as year')
-        )
         .sum('price as revenue')
         .count('* as services_count')
-        .groupBy(db.raw('EXTRACT(MONTH FROM start_date), EXTRACT(YEAR FROM start_date)'))
-        .orderBy('year', 'desc')
-        .orderBy('month', 'desc')
-        .limit(6)
+        .first()
 
       return response.ok({
         dashboard_stats: {
@@ -430,7 +475,7 @@ export default class AdminController {
         top_services: topServices,
         top_providers: topProviders,
         services_by_type: servicesByType,
-        monthly_revenue: monthlyRevenue,
+        monthly_revenue: monthlyRevenue?.revenue || 0,
         generated_at: DateTime.now().toISO(),
       })
     } catch (error) {
@@ -450,22 +495,13 @@ export default class AdminController {
   async validatePrestataire({ request, response }: HttpContext) {
     try {
       const prestataireId = request.param('id')
-      const { validation_status, admin_comments, verified_qualifications } = request.body()
-
-      if (!['approved', 'rejected', 'pending'].includes(validation_status)) {
-        return response.status(400).send({
-          error_message: 'Invalid validation status. Must be: approved, rejected, or pending',
-        })
-      }
+      const { validation_status, admin_comments } = await request.validateUsing(
+        validatePrestataireValidator
+      )
 
       // Vérifier que le prestataire existe
       const prestataire = await Prestataire.findOrFail(prestataireId)
       const user = await Utilisateurs.findOrFail(prestataireId)
-
-      // Mise à jour du statut du prestataire
-      const updateData: any = {
-        updatedAt: DateTime.now(),
-      }
 
       if (validation_status === 'approved') {
         // Activer le compte utilisateur si approuvé
@@ -503,7 +539,6 @@ export default class AdminController {
           rating: prestataire.rating,
         },
         admin_comments: admin_comments || null,
-        verified_qualifications: verified_qualifications || [],
       })
     } catch (error) {
       console.error('Prestataire validation error:', error)
@@ -538,7 +573,10 @@ export default class AdminController {
         .join('prestataires', 'services.prestataireId', 'prestataires.id')
         .join('utilisateurs', 'prestataires.id', 'utilisateurs.id')
         .where('services.status', 'completed')
-        .whereBetween('services.start_date', [startOfMonth.toSQL(), endOfMonth.toSQL()])
+        .whereBetween('services.start_date', [
+          startOfMonth.toFormat('yyyy-MM-dd'),
+          endOfMonth.toFormat('yyyy-MM-dd'),
+        ])
         .select(
           'services.prestataireId',
           'utilisateurs.first_name',
@@ -550,8 +588,28 @@ export default class AdminController {
           'services.id as service_id'
         )
 
+      // Définir le type pour les factures
+      interface FactureData {
+        prestataire: {
+          id: number
+          first_name: string
+          last_name: string
+          email: string
+        }
+        services: Array<{
+          service_id: number
+          service_name: string
+          original_price: number
+          commission_rate: number
+          prestataire_amount: number
+          service_date: string
+        }>
+        total_amount: number
+        service_count: number
+      }
+
       // Grouper par prestataire pour créer les factures
-      const facturesByPrestataire = {}
+      const facturesByPrestataire: Record<number, FactureData> = {}
       completedServices.forEach((service) => {
         const prestataireId = service.prestataireId
         if (!facturesByPrestataire[prestataireId]) {

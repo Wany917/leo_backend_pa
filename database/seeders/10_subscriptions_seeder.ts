@@ -20,13 +20,11 @@ export default class extends BaseSeeder {
     const francois = await Utilisateurs.findBy('email', 'contact@epiceriefine-paris.fr')
     const nathalie = await Utilisateurs.findBy('email', 'contact@savons-marseille.fr')
 
-    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
     const subscriptions = []
 
-    // Clients avec abonnement Free/Starter
     if (marie) {
       subscriptions.push({
-        utilisateur_id: marie.id, // Marie Dupont - ID dynamique
+        utilisateur_id: marie.id,
         subscription_type: 'free',
         monthly_price: 0.0,
         status: 'active',
