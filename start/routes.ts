@@ -610,6 +610,9 @@ router
 
 router
   .group(() => {
+    // Lister tous les avis (Admin)
+    router.get('/', [RatingsController, 'index']).use([middleware.auth(), middleware.admin()])
+
     // Créer une évaluation
     router.post('/', [RatingsController, 'create']).use(middleware.auth())
 
@@ -635,6 +638,11 @@ router
     // Admin: Modérer une évaluation
     router
       .patch('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Admin: Modérer une évaluation (route POST alternative pour éviter problèmes CORS)
+    router
+      .post('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
       .use([middleware.auth(), middleware.admin()])
   })
   .prefix('ratings')
