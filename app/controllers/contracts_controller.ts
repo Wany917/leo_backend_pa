@@ -163,4 +163,65 @@ export default class ContractsController {
       return response.internalServerError({ message: 'Erreur serveur.', error: error.toString() })
     }
   }
+
+  async getAllForAdmin({ response }: HttpContext) {
+    try {
+      // Utiliser des jointures SQL au lieu de preload
+      const contracts = await Contract.query()
+        .select([
+          'contracts.*',
+          'contract_plans.name as plan_name',
+          'contract_plans.price as plan_price',
+          'contract_plans.description as plan_description',
+          'utilisateurs.first_name as user_first_name',
+          'utilisateurs.last_name as user_last_name',
+          'utilisateurs.email as user_email',
+          'utilisateurs.phone_number as user_phone_number',
+          'commercants.store_name',
+          'commercants.business_address',
+          'commercants.contact_number',
+          'commercants.verification_state',
+        ])
+        .innerJoin('contract_plans', 'contracts.contract_plan_id', 'contract_plans.id')
+        .innerJoin('utilisateurs', 'contracts.commercant_id', 'utilisateurs.id')
+        .leftJoin('commercants', 'utilisateurs.id', 'commercants.id')
+        .orderBy('contracts.created_at', 'desc')
+
+      const formattedContracts = contracts.map((contract) => ({
+        id: contract.id,
+        status: contract.status,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+        createdAt: contract.createdAt,
+        updatedAt: contract.updatedAt,
+        plan: {
+          id: contract.contractPlanId,
+          name: contract.$extras.plan_name,
+          price: contract.$extras.plan_price,
+          description: contract.$extras.plan_description,
+        },
+        commercant: {
+          id: contract.commercantId,
+          storeName: contract.$extras.store_name,
+          businessAddress: contract.$extras.business_address,
+          contactNumber: contract.$extras.contact_number,
+          verificationState: contract.$extras.verification_state,
+          user: {
+            id: contract.commercantId,
+            firstName: contract.$extras.user_first_name,
+            lastName: contract.$extras.user_last_name,
+            email: contract.$extras.user_email,
+            phone: contract.$extras.user_phone_number,
+          },
+        },
+      }))
+
+      return response.ok(formattedContracts)
+    } catch (error) {
+      return response.internalServerError({
+        message: 'Erreur lors de la récupération des contrats',
+        error: error.toString(),
+      })
+    }
+  }
 }

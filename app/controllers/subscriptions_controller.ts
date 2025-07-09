@@ -192,4 +192,49 @@ export default class SubscriptionsController {
       })
     }
   }
+
+  async getAllClientsForAdmin({ response }: HttpContext) {
+    try {
+      // Approche simplifiée : utiliser seulement preload basique
+      const subscriptions = await Subscription.query()
+        .preload('utilisateur', (userQuery) => {
+          userQuery.preload('client')
+        })
+        .orderBy('created_at', 'desc')
+
+      const formattedSubscriptions = subscriptions.map((subscription) => {
+        const features = Subscription.getSubscriptionFeatures()[subscription.subscription_type]
+
+        return {
+          id: subscription.id,
+          subscription_type: subscription.subscription_type,
+          monthly_price: subscription.monthly_price,
+          start_date: subscription.start_date,
+          end_date: subscription.end_date,
+          status: subscription.status,
+          is_active: subscription.isActive,
+          is_expired: subscription.isExpired,
+          created_at: subscription.createdAt,
+          updated_at: subscription.updatedAt,
+          features,
+          utilisateur: {
+            id: subscription.utilisateur.id,
+            email: subscription.utilisateur.email,
+            client: subscription.utilisateur.client
+              ? {
+                  id: subscription.utilisateur.client.id,
+                }
+              : null,
+          },
+        }
+      })
+
+      return response.ok(formattedSubscriptions)
+    } catch (error) {
+      return response.internalServerError({
+        message: 'Erreur lors de la récupération des abonnements',
+        error: error.toString(),
+      })
+    }
+  }
 }

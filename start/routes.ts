@@ -283,14 +283,23 @@ router
       .get('shopkeeper-deliveries', [ShopkeeperDeliveriesController, 'getAllForAdmin'])
       .use([middleware.auth(), middleware.admin()])
 
-    // Route de suppression des livraisons de commerçants pour les admins
-    router
-      .delete('shopkeeper-deliveries/:id', [ShopkeeperDeliveriesController, 'deleteForAdmin'])
-      .use([middleware.auth(), middleware.admin()])
-
     // Gestion des annonces admin avec informations utilisateur complètes
     router
       .get('annonces', [AnnonceController, 'getAdminAnnonces'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Gestion des contrats des commerçants pour l'admin
+    router
+      .get('shopkeeper-contracts', [ContractsController, 'getAllForAdmin'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Gestion des abonnements des clients pour l'admin
+    router
+      .get('client-subscriptions', [SubscriptionsController, 'getAllClientsForAdmin'])
+      .use([middleware.auth(), middleware.admin()])
+      
+    router
+      .delete('shopkeeper-deliveries/:id', [ShopkeeperDeliveriesController, 'deleteForAdmin'])
       .use([middleware.auth(), middleware.admin()])
 
     router.get(':id', [AdminController, 'get']).use(middleware.auth())
