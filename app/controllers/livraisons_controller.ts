@@ -172,7 +172,7 @@ export default class LivraisonsController {
       const enrichedLivraisons = livraisons.map((livraison) => {
         const serialized = livraison.serialize()
 
-        console.log('💰 Processing livraison payment data:', {
+        console.log(' Processing livraison payment data:', {
           id: livraison.id,
           paymentStatus: livraison.paymentStatus,
           paymentIntentId: livraison.paymentIntentId,

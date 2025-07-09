@@ -14,6 +14,9 @@ export default class Prestataire extends BaseModel {
   @column()
   declare rating: number | null
 
+  @column({ columnName: 'stripe_account_id' })
+  declare stripeAccountId: string | null
+
   @belongsTo(() => Utilisateurs, { foreignKey: 'id' })
   declare user: BelongsTo<typeof Utilisateurs>
 
@@ -133,7 +136,7 @@ export default class Prestataire extends BaseModel {
         .map((rating) => {
           const numRating =
             typeof rating.overall_rating === 'string'
-              ? parseFloat(rating.overall_rating)
+              ? Number.parseFloat(rating.overall_rating)
               : rating.overall_rating
           return !isNaN(numRating) ? numRating : null
         })

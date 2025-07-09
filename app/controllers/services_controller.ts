@@ -751,7 +751,7 @@ export default class ServicesController {
   // ===============================================
 
   /**
-   * 💰 FINALISER SERVICE ET DISTRIBUER GAINS
+   *  FINALISER SERVICE ET DISTRIBUER GAINS
    * Marque un service comme terminé et distribue les gains au prestataire
    */
   async completeServiceAndDistributePayment({ request, response, auth }: HttpContext) {

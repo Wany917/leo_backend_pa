@@ -278,10 +278,41 @@ export default class StripeController {
         })
       }
 
+      // Vérifier si un Payment Intent existe déjà pour cette livraison et qu'il est encore valide
+      if (livraison.paymentIntentId && livraison.paymentStatus === 'unpaid') {
+        try {
+          const existingPI = await stripe.paymentIntents.retrieve(livraison.paymentIntentId)
+
+          // Statuts où le client doit encore confirmer le paiement
+          const reusableStatuses = [
+            'requires_payment_method',
+            'requires_confirmation',
+            'requires_action',
+          ] as const
+
+          if (reusableStatuses.includes(existingPI.status as any)) {
+            console.log(
+              `↩️ Réutilisation du Payment Intent ${existingPI.id} pour la livraison ${livraisonId}`
+            )
+            return response.ok({
+              success: true,
+              client_secret: existingPI.client_secret,
+              payment_intent_id: existingPI.id,
+              reused: true,
+            })
+          }
+        } catch (piError) {
+          console.warn(
+            "⚠️ Impossible de récupérer le Payment Intent existant, création d'un nouveau",
+            piError
+          )
+        }
+      }
+
       // Créer ou récupérer le client Stripe
       const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
 
-      // 🔒 ESCROW: Créer Payment Intent avec capture manuelle
+      // 🔒 ESCROW: Créer un nouveau Payment Intent avec capture manuelle
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Number(amount),
         currency: 'eur',
@@ -295,8 +326,7 @@ export default class StripeController {
         capture_method: 'manual', // ESCROW: L'argent est bloqué jusqu'à validation
       })
 
-      // 🚀 MISE À JOUR DE LA LIVRAISON - STATUT PENDING (authorized côté frontend)
-      livraison.paymentStatus = 'pending' // authorized côté frontend
+      // 🚀 Enregistrer le Payment Intent sans changer le statut de paiement pour l'instant
       livraison.paymentIntentId = paymentIntent.id
       livraison.amount = Number(amount) / 100 // Convertir centimes en euros
       await livraison.save()
@@ -307,7 +337,7 @@ export default class StripeController {
 
       // 🔧 CORRECTION MAJEURE : NE PAS AJOUTER LES FONDS AU PORTEFEUILLE MAINTENANT
       // Les fonds ne seront ajoutés qu'après validation du code selon le cahier des charges
-      console.log('💰 ESCROW: Fonds bloqués chez Stripe, pas encore dans le portefeuille')
+      console.log(' ESCROW: Fonds bloqués chez Stripe, pas encore dans le portefeuille')
       console.log('🔒 Les fonds seront libérés après validation du code de livraison')
 
       return response.ok({
@@ -494,7 +524,7 @@ export default class StripeController {
   // ===============================================
 
   /**
-   * 💰 CRÉER PAIEMENT LIVRAISON AVEC OPTION CAGNOTTE
+   *  CRÉER PAIEMENT LIVRAISON AVEC OPTION CAGNOTTE
    * Permet aux clients de choisir entre Stripe ou leur cagnotte
    */
   async createLivraisonPaymentWithWallet({ request, response, auth }: HttpContext) {
