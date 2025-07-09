@@ -63,13 +63,19 @@ export default class LivraisonsController {
         { client: trx }
       )
 
+      // Charger les colis liés à l'annonce
       await annonce.load('colis' as any)
 
+      // Associer les colis à la livraison
       const colisIds = annonce.colis.map((colis) => colis.id)
-
       await livraison.related('colis').attach(colisIds, trx)
 
       await livraison.load('colis' as any)
+
+      // 🆕 Mettre à jour le statut de l'annonce pour qu'elle ne soit plus listée comme « active »
+      annonce.status = 'pending'
+      annonce.useTransaction(trx)
+      await annonce.save()
 
       await trx.commit()
 
@@ -247,6 +253,60 @@ export default class LivraisonsController {
         error: "Une erreur est survenue lors de la récupération des livraisons de l'annonce",
         details: error.message,
       })
+    }
+  }
+
+  async cancel({ request, auth, response }: HttpContext) {
+    try {
+      const livraisonId = Number(request.param('id'))
+      if (Number.isNaN(livraisonId)) {
+        return response.badRequest({ error: 'ID de livraison invalide' })
+      }
+
+      // Authentifier l’utilisateur
+      const user = await auth.authenticate()
+
+      // Récupérer la livraison + annonce liée
+      const livraison = await Livraison.findOrFail(livraisonId)
+      await livraison.load('annonce')
+
+      // Vérifier que l’utilisateur est bien le livreur assigné
+      if (livraison.livreurId !== user.id) {
+        return response.unauthorized({
+          error: 'Vous n’êtes pas autorisé à annuler cette livraison',
+        })
+      }
+
+      // Ne pas annuler si déjà terminée ou annulée
+      if (['completed', 'cancelled'].includes(livraison.status)) {
+        return response.badRequest({ error: 'Cette livraison ne peut plus être annulée' })
+      }
+
+      const trx = await db.transaction()
+      try {
+        // 1. Annuler la livraison
+        livraison.status = 'cancelled'
+        livraison.useTransaction(trx)
+        await livraison.save()
+
+        // 2. Réactiver l’annonce associée (si existe)
+        if (livraison.annonce) {
+          const annonce = livraison.annonce
+          annonce.status = 'active'
+          annonce.useTransaction(trx)
+          await annonce.save()
+        }
+
+        await trx.commit()
+      } catch (err) {
+        await trx.rollback()
+        throw err
+      }
+
+      return response.ok({ success: true, message: 'Livraison annulée avec succès' })
+    } catch (error) {
+      console.error('Erreur annulation livraison:', error)
+      return response.internalServerError({ success: false, message: error.message })
     }
   }
 }

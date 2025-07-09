@@ -39,6 +39,7 @@ const StripeController = () => import('#controllers/stripe_controller')
 const RatingController = () => import('#controllers/rating_controller')
 const ContractsController = () => import('#controllers/contracts_controller')
 const ShopkeeperDeliveriesController = () => import('#controllers/shopkeeper_deliveries_controller')
+const StripeConnectController = () => import('#controllers/stripe_connect_controller')
 
 import { middleware } from '#start/kernel'
 
@@ -191,7 +192,9 @@ router
   .group(() => {
     router.get('/', [AnnonceController, 'getAllAnnonces'])
     router.post('create', [AnnonceController, 'create'])
-    router.post(':id/livraisons', [LivraisonController, 'create'])
+    router.post('/annonces/:id/livraisons', [LivraisonController, 'create'])
+    // Annulation d’une livraison par le livreur
+    router.post('/livraisons/:id/cancel', [LivraisonController, 'cancel'])
     router.get(':id/livraisons', [LivraisonController, 'getAnnounceLivraisons'])
     router.get(':id', [AnnonceController, 'getAnnonce'])
     router.get('/user/:utilisateur_id', [AnnonceController, 'getUserAnnonces'])
@@ -543,6 +546,7 @@ router
   .group(() => {
     // Routes utilisateur (authentifié)
     router.get('user/:userId', [PortefeuilleController, 'show']).use(middleware.auth())
+    router.get('show', [PortefeuilleController, 'show']).use(middleware.auth()) // 🆕 Route pour le frontend
     router
       .post('user/:userId/configure-virement', [PortefeuilleController, 'configureVirementAuto'])
       .use(middleware.auth())
@@ -554,6 +558,20 @@ router
       .use(middleware.auth())
     router
       .post('user/:userId/demander-virement', [PortefeuilleController, 'demanderVirement'])
+      .use(middleware.auth())
+
+    // 🆕 NOUVELLES ROUTES CLIENT MULTI-RÔLES
+    router
+      .post('recharger-cagnotte', [PortefeuilleController, 'rechargerCagnotte'])
+      .use(middleware.auth())
+    router
+      .post('confirmer-recharge-cagnotte', [PortefeuilleController, 'confirmerRechargeCagnotte'])
+      .use(middleware.auth())
+    router
+      .post('payer-depuis-cagnotte', [PortefeuilleController, 'payerDepuisCagnotte'])
+      .use(middleware.auth())
+    router
+      .get('gains-prestataire', [PortefeuilleController, 'getGainsPrestataire'])
       .use(middleware.auth())
 
     // Routes admin
@@ -585,6 +603,50 @@ router
     router.delete(':id', [RatingController, 'delete']).use(middleware.auth())
   })
   .prefix('ratings')
+// ROUTES STRIPE CONNECT - VIREMENTS BANCAIRES RÉELS
+// ===============================================
+router
+  .group(() => {
+    // Gestion des comptes Connect Express (LIVREURS)
+    router
+      .post('create-account', [StripeConnectController, 'createExpressAccount'])
+      .use(middleware.auth())
+    router
+      .post('onboarding-link', [StripeConnectController, 'createOnboardingLink'])
+      .use(middleware.auth())
+    router
+      .get('account-status', [StripeConnectController, 'checkAccountStatus'])
+      .use(middleware.auth())
+    router
+      .get('dashboard-link', [StripeConnectController, 'createDashboardLink'])
+      .use(middleware.auth())
+
+    // Virements bancaires réels (LIVREURS)
+    router
+      .post('transfer-from-wallet', [StripeConnectController, 'transferFromWallet'])
+      .use(middleware.auth())
+    router
+      .post('configure-auto-payouts', [StripeConnectController, 'configureAutomaticPayouts'])
+      .use(middleware.auth())
+
+    // 🆕 NOUVELLES ROUTES CLIENT MULTI-RÔLES
+    router
+      .post('client/create-account', [StripeConnectController, 'createClientExpressAccount'])
+      .use(middleware.auth())
+    router
+      .post('client/onboarding-link', [StripeConnectController, 'createClientOnboardingLink'])
+      .use(middleware.auth())
+    router
+      .get('client/account-status', [StripeConnectController, 'checkClientAccountStatus'])
+      .use(middleware.auth())
+    router
+      .post('client/dashboard-link', [StripeConnectController, 'createClientDashboardLink'])
+      .use(middleware.auth())
+    router
+      .post('client/transfer-from-wallet', [StripeConnectController, 'transferFromClientWallet'])
+      .use(middleware.auth())
+  })
+  .prefix('stripe-connect')
 
 // ===============================================
 // ROUTES STRIPE - PAIEMENTS & ABONNEMENTS
@@ -614,6 +676,9 @@ router
       .get('invoice/:invoiceId/download', [StripeController, 'downloadInvoice'])
       .use(middleware.auth())
 
+    // 🔍 DEBUG: Route pour vérifier les factures Stripe
+    router.get('debug/invoices', [StripeController, 'debugListInvoices']).use(middleware.auth())
+
     // Gestion des paiements (authentifié)
     router
       .post('payments/delivery', [StripeController, 'createDeliveryPayment'])
@@ -631,7 +696,6 @@ router
 
 router.get('documents/:filename', [FilesController, 'downloadJustification'])
 
-// Route webhook alternative pour compatibilité avec Stripe Dashboard
 router
   .group(() => {
     router.post('stripe/webhook', [StripeController, 'webhook'])

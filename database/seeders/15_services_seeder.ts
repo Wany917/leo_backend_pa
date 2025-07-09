@@ -1,176 +1,210 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import Service from '#models/service'
 import Utilisateurs from '#models/utilisateurs'
+import { DateTime } from 'luxon'
 
 export default class extends BaseSeeder {
   async run() {
-    // Vérifier si des services existent déjà
-    const existingServices = await this.client.from('services').select('*').limit(1)
+    const existingServices = await Service.query().limit(1)
     if (existingServices.length > 0) {
       console.log('Des services existent déjà, seeder ignoré')
       return
     }
 
-    // ✅ RÉCUPÉRER LES PRESTATAIRES PAR EMAIL PLUTÔT QUE PAR ID FIXE
-    const isabelle = await Utilisateurs.findBy('email', 'isabelle.moreau@gmail.com')
-    const thomas = await Utilisateurs.findBy('email', 'thomas.petit@services.fr')
+    // ✅ RÉCUPÉRER LES PRESTATAIRES PAR EMAIL
+    const isabelle = await Utilisateurs.findBy('email', 'isabelle.cohen@prestafake.fr')
+    const thomas = await Utilisateurs.findBy('email', 'thomas.roux@servicefake.com')
+    const sandra = await Utilisateurs.findBy('email', 'sandra.petit@pretafake.org')
 
-    if (!isabelle || !thomas) {
-      console.log('❌ Prestataires non trouvés, vérifiez les seeders précédents')
+    if (!isabelle || !thomas || !sandra) {
+      console.log('❌ Prestataires non trouvés pour les services')
       return
     }
 
-    // Récupérer les IDs des prestataires depuis la table prestataires
-    const isabellePrestataire = await this.client
-      .from('prestataires')
-      .where('id', isabelle.id)
-      .first()
-    const thomasPrestataire = await this.client.from('prestataires').where('id', thomas.id).first()
-
-    if (!isabellePrestataire || !thomasPrestataire) {
-      console.log('❌ Profils prestataires non trouvés')
-      return
-    }
-
-    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
+    // ✅ SERVICES ECODELI - SELON CAHIER DES CHARGES (services à la personne)
     const services = [
-      // Services d'Isabelle Moreau - Transport de personnes
+      // =================================================================
+      // 🧹 SERVICES MÉNAGE ET ENTRETIEN
+      // =================================================================
       {
-        prestataireId: isabellePrestataire.id, // ID dynamique
-        service_type_id: 1, // Transport de personnes
-        name: 'Transport médical Paris Intra-muros',
+        prestataireId: isabelle.id,
+        name: 'Ménage complet domicile',
         description:
-          'Transport adapté pour personnes à mobilité réduite avec accompagnement médical',
+          'Service de ménage professionnel à domicile. Cuisine, salon, chambres, salle de bain. Aspirateur, serpillère, dépoussiérage, nettoyage sanitaires. Produits écologiques fournis.',
+        price: 25.0,
+        location: '1er, 2ème, 3ème, 4ème arrondissements Paris',
+        status: 'available',
+        duration: 120, // 2h
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'hourly' as const,
+        hourly_rate: 25.0,
+        availability_description: 'Lundi au vendredi 9h-18h, weekend sur demande',
+        home_service: true,
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 15 }),
+        updatedAt: DateTime.now().minus({ days: 2 }),
+      },
+      {
+        prestataireId: isabelle.id,
+        name: 'Repassage express à domicile',
+        description:
+          "Service de repassage professionnel chez vous. Jusqu'à 20 pièces par session. Fer et table à repasser fournis. Pliage et rangement inclus.",
         price: 35.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Paris Intra-muros',
+        location: 'Paris centre (1er au 11ème)',
         status: 'available',
-        duration: 120, // 2 heures
-        availability_description: 'Lundi à vendredi, 8h-18h',
-        home_service: true,
-        requires_materials: false,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      {
-        prestataireId: isabellePrestataire.id, // ID dynamique
-        service_type_id: 1,
-        name: 'Trajet aéroport Charles de Gaulle',
-        description: 'Transport vers/depuis CDG avec assistance bagages',
-        price: 65.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Paris - CDG',
-        status: 'available',
-        duration: 180, // 3 heures
-        availability_description: 'Tous les jours, 24h/24',
-        home_service: true,
-        requires_materials: false,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-
-      // Services de Thomas Petit - Services ménagers
-      {
-        prestataireId: thomasPrestataire.id, // ID dynamique
-        service_type_id: 2, // Services ménagers
-        name: 'Grand ménage appartement T2/T3',
-        description:
-          'Ménage complet avec produits écologiques inclus - fenêtres, sols, salle de bain',
-        price: 75.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Lille et métropole',
-        status: 'available',
-        duration: 240, // 4 heures
-        availability_description: 'Lundi à samedi, 8h-17h',
-        home_service: true,
-        requires_materials: true,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      {
-        prestataireId: thomasPrestataire.id, // ID dynamique
-        service_type_id: 2,
-        name: 'Ménage régulier hebdomadaire',
-        description: 'Service de ménage hebdomadaire pour maintenance courante',
-        price: 45.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Lille',
-        status: 'available',
-        duration: 120, // 2 heures
-        availability_description: 'Lundi à vendredi, 9h-16h',
-        home_service: true,
-        requires_materials: true,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      {
-        prestataireId: thomasPrestataire.id, // ID dynamique
-        service_type_id: 2,
-        name: 'Nettoyage après déménagement',
-        description: 'Remise en état complète après déménagement - état des lieux',
-        price: 120.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Lille et environs',
-        status: 'available',
-        duration: 360, // 6 heures
-        availability_description: 'Sur rendez-vous, 7j/7',
-        home_service: true,
-        requires_materials: true,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-
-      // Service avec tarif horaire pour test
-      {
-        prestataireId: isabellePrestataire.id, // ID dynamique
-        service_type_id: 7, // Garde d'enfants
-        name: 'Baby-sitting occasionnel',
-        description: "Garde d'enfants ponctuelle pour sorties ou événements",
-        price: 0.0, // Prix fixe à 0 car tarif horaire
-        pricing_type: 'hourly',
-        hourly_rate: 12.0,
-        location: 'Paris et banlieue',
-        status: 'available',
-        duration: null, // Variable selon la demande
-        availability_description: 'Soirées et weekends',
-        home_service: true,
-        requires_materials: false,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-
-      // Service complété pour test
-      {
-        prestataireId: isabellePrestataire.id, // ID dynamique
-        service_type_id: 1,
-        name: 'Transport urgent hôpital',
-        description: "Transport d'urgence pour examen médical",
-        price: 50.0,
-        pricing_type: 'fixed',
-        hourly_rate: null,
-        location: 'Paris 11ème vers Hôpital Saint-Antoine',
-        status: 'completed',
         duration: 90,
-        availability_description: 'Urgences 24h/24',
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'fixed' as const,
+        hourly_rate: null,
+        availability_description: 'Mardi, jeudi, samedi 14h-19h',
         home_service: true,
         requires_materials: false,
-        is_active: true,
-        created_at: new Date('2025-01-20'),
-        updated_at: new Date('2025-01-20'),
+        createdAt: DateTime.now().minus({ days: 10 }),
+        updatedAt: DateTime.now().minus({ days: 1 }),
+      },
+
+      // =================================================================
+      // 👶 SERVICES GARDE ET ACCOMPAGNEMENT
+      // =================================================================
+      {
+        prestataireId: thomas.id,
+        name: "Garde d'enfants ponctuelle",
+        description:
+          "Garde d'enfants qualifiée pour sorties, rendez-vous ou urgences. Expérience 8 ans, références vérifiées. Activités éducatives, aide aux devoirs possible.",
+        price: 15.0,
+        location: 'Paris Est (10ème, 11ème, 12ème, 20ème)',
+        status: 'available',
+        duration: 180, // 3h minimum
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'hourly' as const,
+        hourly_rate: 15.0,
+        availability_description: 'Disponible soirs de semaine après 17h et weekends',
+        home_service: true,
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 8 }),
+        updatedAt: DateTime.now(),
+      },
+      {
+        prestataireId: thomas.id,
+        name: 'Accompagnement personnes âgées',
+        description:
+          'Accompagnement bienveillant pour courses, rendez-vous médicaux, promenades. Formation aide à la personne, patient et attentionné.',
+        price: 20.0,
+        location: 'Tout Paris',
+        status: 'available',
+        duration: 120,
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'hourly' as const,
+        hourly_rate: 20.0,
+        availability_description: 'Lundi au samedi 8h-20h',
+        home_service: false, // Sorties extérieures
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 20 }),
+        updatedAt: DateTime.now().minus({ hours: 3 }),
+      },
+
+      // =================================================================
+      // 🔧 SERVICES TECHNIQUES ET BRICOLAGE
+      // =================================================================
+      {
+        prestataireId: sandra.id,
+        name: 'Petits travaux et bricolage',
+        description:
+          'Montage meubles IKEA, accrochage tableaux, petite plomberie, réparations diverses. Outils professionnels, travail soigné et rapide.',
+        price: 45.0,
+        location: 'Paris Ouest (7ème, 8ème, 15ème, 16ème, 17ème)',
+        status: 'available',
+        duration: 60,
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'custom' as const, // Devis selon travaux
+        hourly_rate: 35.0,
+        availability_description: 'Interventions sur rendez-vous, délai 48h',
+        home_service: true,
+        requires_materials: true, // Selon travaux
+        createdAt: DateTime.now().minus({ days: 5 }),
+        updatedAt: DateTime.now().minus({ hours: 6 }),
+      },
+      {
+        prestataireId: sandra.id,
+        name: 'Dépannage informatique domicile',
+        description:
+          'Installation, configuration, résolution de problèmes informatiques. PC, Mac, tablettes, smartphones. Formation utilisateur incluse.',
+        price: 60.0,
+        location: 'Île-de-France',
+        status: 'validated', // Service vérifié par admin
+        duration: 90,
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'fixed' as const,
+        hourly_rate: null,
+        availability_description: 'Urgences 7j/7, interventions planifiées semaine',
+        home_service: true,
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 30 }),
+        updatedAt: DateTime.now().minus({ days: 1 }),
+      },
+
+      // =================================================================
+      // 📚 SERVICES ÉDUCATIFS
+      // =================================================================
+      {
+        prestataireId: thomas.id,
+        name: 'Soutien scolaire mathématiques',
+        description:
+          'Cours particuliers mathématiques niveau collège-lycée. Méthodologie, exercices, préparation examens. Enseignant certifié, résultats garantis.',
+        price: 30.0,
+        location: 'Paris 5ème, 6ème, 14ème, 15ème',
+        status: 'scheduled', // En cours avec un élève
+        duration: 120,
+        isActive: true,
+        service_type_id: null,
+        pricing_type: 'hourly' as const,
+        hourly_rate: 30.0,
+        availability_description: 'Créneaux disponibles mercredi après-midi et weekend',
+        home_service: true,
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 12 }),
+        updatedAt: DateTime.now().minus({ hours: 2 }),
+      },
+
+      // =================================================================
+      // 🚫 SERVICES SUSPENDUS/REFUSÉS (pour test des états)
+      // =================================================================
+      {
+        prestataireId: isabelle.id,
+        name: 'Service test suspendu',
+        description: 'Service temporairement suspendu pour mise à jour des conditions.',
+        price: 20.0,
+        location: 'Paris',
+        status: 'suspended',
+        duration: 60,
+        isActive: false,
+        service_type_id: null,
+        pricing_type: 'fixed' as const,
+        hourly_rate: null,
+        availability_description: 'Suspendu temporairement',
+        home_service: true,
+        requires_materials: false,
+        createdAt: DateTime.now().minus({ days: 3 }),
+        updatedAt: DateTime.now().minus({ hours: 1 }),
       },
     ]
 
-    await this.client.table('services').insert(services)
-    console.log(`✅ ${services.length} services créés avec succès avec auto-incrémentation`)
+    // ✅ CRÉER LES SERVICES AVEC GESTION D'ERREURS
+    for (const serviceData of services) {
+      try {
+        await Service.create(serviceData)
+        console.log(`✅ Service créé: ${serviceData.name} (${serviceData.status})`)
+      } catch (error) {
+        console.log(`❌ Erreur création service ${serviceData.name}:`, error.message)
+      }
+    }
+
+    console.log(`✅ ${services.length} services EcoDeli créés avec succès`)
   }
 }

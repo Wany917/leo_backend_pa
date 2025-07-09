@@ -338,28 +338,55 @@ export default class BookingsController {
         .count('* as total')
         .first()
 
-      // Revenus du mois en cours
+      // Revenus du mois en cours - Calculer à partir des prix des services
       const currentMonth = DateTime.now().startOf('month')
       const nextMonth = currentMonth.plus({ month: 1 })
 
+      // Utiliser un join avec la table services pour récupérer les prix
       const monthlyRevenue = await db
         .from('bookings')
-        .where('status', 'completed')
-        .whereBetween('booking_date', [currentMonth.toSQL()!, nextMonth.toSQL()!])
-        .sum('total_price as revenue')
+        .join('services', 'bookings.service_id', 'services.id')
+        .where('bookings.status', 'completed')
+        .whereBetween('bookings.booking_date', [currentMonth.toSQL()!, nextMonth.toSQL()!])
+        .sum('services.price as revenue')
         .first()
+
+      // Calculer la moyenne des réservations par type de statut
+      const totalCount = totalBookings?.total || 0
+      const pendingCount = pendingBookings?.total || 0
+      const confirmedCount = confirmedBookings?.total || 0
+      const completedCount = completedBookings?.total || 0
+      const cancelledCount = cancelledBookings?.total || 0
+
+      // Calcul des pourcentages
+      const pendingPercentage =
+        totalCount > 0 ? ((pendingCount / totalCount) * 100).toFixed(1) : '0.0'
+      const confirmedPercentage =
+        totalCount > 0 ? ((confirmedCount / totalCount) * 100).toFixed(1) : '0.0'
+      const completedPercentage =
+        totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(1) : '0.0'
+      const cancelledPercentage =
+        totalCount > 0 ? ((cancelledCount / totalCount) * 100).toFixed(1) : '0.0'
 
       return response.ok({
         stats: {
-          total: totalBookings?.total || 0,
-          pending: pendingBookings?.total || 0,
-          confirmed: confirmedBookings?.total || 0,
-          completed: completedBookings?.total || 0,
-          cancelled: cancelledBookings?.total || 0,
+          total: totalCount,
+          pending: pendingCount,
+          confirmed: confirmedCount,
+          completed: completedCount,
+          cancelled: cancelledCount,
           monthly_revenue: monthlyRevenue?.revenue || 0,
+          // Ajout des pourcentages pour corriger l'affichage 0.0%
+          pending_percentage: pendingPercentage,
+          confirmed_percentage: confirmedPercentage,
+          completed_percentage: completedPercentage,
+          cancelled_percentage: cancelledPercentage,
+          completion_rate:
+            totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(1) : '0.0',
         },
       })
     } catch (error) {
+      console.error('Booking stats error:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch booking stats',
         error: error.message,
@@ -391,4 +418,3 @@ export default class BookingsController {
     }
   }
 }
- 

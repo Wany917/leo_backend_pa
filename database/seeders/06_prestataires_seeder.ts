@@ -3,91 +3,61 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // Vérifier si des prestataires existent déjà
-    const existingPrestataires = await this.client.from('prestataires').select('*').limit(1)
-    if (existingPrestataires.length > 0) {
-      console.log('Des prestataires existent déjà, seeder ignoré')
+    // Pas de retour anticipé : on veut mettre à jour ou insérer au besoin
+    // (on garde l'information uniquement pour log éventuel)
+    const existingPrestataires = await this.client.from('prestataires').count('* as total')
+    if (Number(existingPrestataires[0].total) > 0) {
+      console.log(
+        `ℹ️ ${existingPrestataires[0].total} prestataires déjà présents, mise à jour/complétion...`
+      )
+    }
+
+    // ✅ RÉCUPÉRER LES UTILISATEURS EXISTANTS
+    const isabelle = await Utilisateurs.findBy('email', 'isabelle.cohen@prestafake.fr')
+    const thomas = await Utilisateurs.findBy('email', 'thomas.roux@servicefake.com')
+    const sandra = await Utilisateurs.findBy('email', 'sandra.petit@pretafake.org')
+
+    if (!isabelle || !thomas || !sandra) {
+      console.log('❌ Utilisateurs prestataires manquants, seeder ignoré')
       return
     }
 
-    // ✅ CRÉATION SANS IDS FIXES - Laisser l'auto-incrémentation
-    const prestataireUsers = [
-      {
-        first_name: 'Isabelle',
-        last_name: 'Moreau',
-        email: 'isabelle.moreau@gmail.com',
-        password: '123456',
-        address: '30 rue de Rennes',
-        city: 'Paris',
-        postalCode: '75006',
-        country: 'France',
-        phone_number: '+33667890123',
-        state: 'open',
-      },
-      {
-        first_name: 'Thomas',
-        last_name: 'Petit',
-        email: 'thomas.petit@services.fr',
-        password: '123456',
-        address: '8 place du Général de Gaulle',
-        city: 'Lille',
-        postalCode: '59000',
-        country: 'France',
-        phone_number: '+33678901234',
-        state: 'open',
-      },
-    ]
-
-    // Créer les utilisateurs et récupérer leurs IDs générés automatiquement
-    const createdUsers = []
-    for (const userData of prestataireUsers) {
-      const user = await Utilisateurs.create(userData)
-      createdUsers.push(user)
-    }
-
-    console.log(
-      `✅ Utilisateurs prestataires créés avec IDs: ${createdUsers.map((u) => u.id).join(', ')}`
-    )
-
-    // Créer les profils prestataires avec les vrais IDs
     const prestataires = [
       {
-        id: createdUsers[0].id, // Isabelle Moreau - ID automatique
+        id: isabelle.id,
         service_type: 'transport_personnes',
         rating: 4.9,
         created_at: new Date(),
         updated_at: new Date(),
       },
       {
-        id: createdUsers[1].id, // Thomas Petit - ID automatique
+        id: thomas.id,
         service_type: 'services_menagers',
         rating: 4.7,
         created_at: new Date(),
         updated_at: new Date(),
       },
-    ]
-
-    await this.client.table('prestataires').insert(prestataires)
-
-    // Créer aussi leurs profils clients avec les vrais IDs
-    const prestataireClients = [
       {
-        id: createdUsers[0].id,
-        loyalty_points: 50,
-        preferred_payment_method: 'bank_transfer',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      {
-        id: createdUsers[1].id,
-        loyalty_points: 75,
-        preferred_payment_method: 'credit_card',
+        id: sandra.id,
+        service_type: 'services_techniques',
+        rating: 4.8,
         created_at: new Date(),
         updated_at: new Date(),
       },
     ]
+    for (const p of prestataires) {
+      const existing = await this.client.from('prestataires').where('id', p.id).first()
+      if (existing) {
+        await this.client.from('prestataires').where('id', p.id).update({
+          service_type: p.service_type,
+          rating: p.rating,
+          updated_at: new Date(),
+        })
+      } else {
+        await this.client.table('prestataires').insert(p)
+      }
+    }
 
-    await this.client.table('clients').insert(prestataireClients)
-    console.log('✅ Prestataires créés avec succès avec auto-incrémentation')
+    console.log('✅ Prestataires vérifiés / insérés (upsert)')
   }
 }
