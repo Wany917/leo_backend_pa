@@ -36,7 +36,7 @@ const FilesController = () => import('#controllers/files_controller')
 const BookingsController = () => import('#controllers/bookings_controller')
 const PortefeuilleController = () => import('#controllers/portefeuille_controller')
 const StripeController = () => import('#controllers/stripe_controller')
-const RatingController = () => import('#controllers/rating_controller')
+const RatingsController = () => import('#controllers/ratings_controller')
 const ContractsController = () => import('#controllers/contracts_controller')
 const ShopkeeperDeliveriesController = () => import('#controllers/shopkeeper_deliveries_controller')
 const StripeConnectController = () => import('#controllers/stripe_connect_controller')
@@ -582,27 +582,6 @@ router
   .prefix('portefeuille')
 
 // ===============================================
-// ROUTES RATINGS/AVIS
-// ===============================================
-router
-  .group(() => {
-    // Création d'avis (authentifié)
-    router.post('/', [RatingController, 'create']).use(middleware.auth())
-
-    // Récupération avis par prestataire (public)
-    router.get('prestataire/:prestataireId', [RatingController, 'getByPrestataire'])
-
-    // Récupération avis par service (public)
-    router.get('service/:serviceId', [RatingController, 'getByService'])
-
-    // Modération admin
-    router
-      .get('admin/all', [RatingController, 'getAllForAdmin'])
-      .use([middleware.auth(), middleware.admin()])
-    router.put(':id', [RatingController, 'update']).use([middleware.auth(), middleware.admin()])
-    router.delete(':id', [RatingController, 'delete']).use(middleware.auth())
-  })
-  .prefix('ratings')
 // ROUTES STRIPE CONNECT - VIREMENTS BANCAIRES RÉELS
 // ===============================================
 router
@@ -693,6 +672,45 @@ router
     router.post('payments/capture', [StripeController, 'capturePayment']).use(middleware.auth())
   })
   .prefix('stripe')
+
+router
+  .group(() => {
+    // Lister tous les avis (Admin)
+    router.get('/', [RatingsController, 'index']).use([middleware.auth(), middleware.admin()])
+
+    // Créer une évaluation
+    router.post('/', [RatingsController, 'create']).use(middleware.auth())
+
+    // Récupérer les évaluations d'un utilisateur
+    router.get('/user/:userId', [RatingsController, 'getByUser'])
+
+    // Récupérer les évaluations d'une livraison/service
+    router.get('/:type/:itemId', [RatingsController, 'getByItem'])
+
+    // 🌟 NOUVEAU: Vérifier si l'utilisateur connecté a déjà évalué un élément
+    router
+      .get('/check/:type/:itemId', [RatingsController, 'checkUserRating'])
+      .use(middleware.auth())
+
+    // Statistiques des évaluations
+    router.get('/stats/:userId', [RatingsController, 'getStats'])
+
+    // Admin: Répondre à une évaluation
+    router
+      .post('/:ratingId/admin-response', [RatingsController, 'adminResponse'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Admin: Modérer une évaluation
+    router
+      .patch('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
+      .use([middleware.auth(), middleware.admin()])
+
+    // Admin: Modérer une évaluation (route POST alternative pour éviter problèmes CORS)
+    router
+      .post('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
+      .use([middleware.auth(), middleware.admin()])
+  })
+  .prefix('ratings')
 
 router.get('documents/:filename', [FilesController, 'downloadJustification'])
 

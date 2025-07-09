@@ -115,7 +115,7 @@ export default class extends BaseSeeder {
       },
 
       // =================================================================
-      // 💰 LIVRAISON PAYÉE À L'AVANCE - Business
+      //  LIVRAISON PAYÉE À L'AVANCE - Business
       // =================================================================
       {
         livreurId: julieL.id,

@@ -13,7 +13,7 @@ export default class Client extends BaseModel {
   @column()
   declare preferred_payment_method: string | null
 
-  @column()
+  @column({ columnName: 'stripe_account_id' })
   declare stripeAccountId: string | null
 
   @belongsTo(() => Utilisateurs, { foreignKey: 'id' })

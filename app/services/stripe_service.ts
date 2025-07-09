@@ -317,8 +317,12 @@ export default class StripeService {
       // Récupérer le Payment Intent
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
+      // Si le paiement est déjà capturé ou non capturable, on n'essaie pas de le capturer de nouveau
       if (paymentIntent.status !== 'requires_capture') {
-        throw new Error(`Payment Intent ${paymentIntentId} n'est pas en attente de capture`)
+        console.warn(
+          `⚠️ Payment Intent ${paymentIntentId} déjà capturé ou non capturable (statut: ${paymentIntent.status})`
+        )
+        return
       }
 
       // Capturer le paiement
@@ -345,7 +349,7 @@ export default class StripeService {
       // Le reste de la logique est gérée par CodeTemporaireController.libererFondsLivraison
       // qui sera appelé après la validation du code
 
-      console.log(`💰 Paiement prêt pour distribution au livreur ${livraison.livreur.id}`)
+      console.log(` Paiement prêt pour distribution au livreur ${livraison.livreur.id}`)
     } catch (error) {
       console.error('❌ Erreur capture paiement après validation:', error)
       throw error
@@ -406,8 +410,26 @@ export default class StripeService {
           await this.handleSubscriptionCancellation(event.data.object as Stripe.Subscription)
           break
 
-        case 'payment_intent.succeeded':
-          // Géré par captureAndDistributePayment
+        case 'payment_intent.succeeded': {
+          const pi = event.data.object as Stripe.PaymentIntent
+
+          // 🔄 RECHARGE CAGNOTTE CLIENT
+          if (pi.metadata?.type === 'wallet_recharge') {
+            try {
+              await this.handleWalletRecharge(pi)
+            } catch (rechargeError) {
+              console.error('❌ Erreur traitement recharge cagnotte (webhook):', rechargeError)
+            }
+            break
+          }
+
+          // Autres paiements directs gérés ailleurs
+          break
+        }
+
+        case 'payment_intent.amount_capturable_updated':
+          // Lorsque le paiement est confirmé et que les fonds sont bloqués (escrow)
+          await this.markDeliveryPaymentPending(event.data.object as Stripe.PaymentIntent)
           break
 
         case 'invoice.payment_succeeded':
@@ -478,7 +500,7 @@ export default class StripeService {
    * Gère le paiement réussi d'une facture
    */
   private static async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-    console.log(`💰 Facture payée: ${invoice.id} - ${invoice.amount_paid / 100}€`)
+    console.log(` Facture payée: ${invoice.id} - ${invoice.amount_paid / 100}€`)
     // Ici on pourrait enregistrer le paiement dans la table payments
   }
 
@@ -587,7 +609,7 @@ export default class StripeService {
   }
 
   /**
-   * 💰 EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE ECODELI
+   *  EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE ECODELI
    * Transfert des fonds du portefeuille vers le compte Stripe Connect du livreur
    */
   static async transferFromWalletToDeliveryman(
@@ -713,7 +735,7 @@ export default class StripeService {
   }
 
   /**
-   * 💰 EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE CLIENT
+   *  EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE CLIENT
    * Transfert des fonds du portefeuille vers le compte Stripe Connect du client
    */
   static async transferFromWalletToClient(
@@ -752,6 +774,124 @@ export default class StripeService {
       }
     } catch (error) {
       console.error('❌ Erreur transfer vers client:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Met à jour la livraison liée au Payment Intent pour indiquer que les fonds
+   * sont désormais capturables (escrow) et que le client peut valider la livraison.
+   */
+  private static async markDeliveryPaymentPending(paymentIntent: Stripe.PaymentIntent) {
+    try {
+      if (paymentIntent.metadata?.type !== 'livraison') {
+        // Ne gérer que les paiements liés aux livraisons
+        return
+      }
+
+      const livraisonId = Number(paymentIntent.metadata.livraison_id)
+      if (!livraisonId) {
+        console.warn('⚠️ payment_intent.amount_capturable_updated sans livraison_id')
+        return
+      }
+
+      const livraisonModule = await import('#models/livraison')
+      const Livraison = livraisonModule.default
+
+      const livraison = await Livraison.find(livraisonId)
+      if (!livraison) {
+        console.warn(`⚠️ Livraison introuvable pour ID ${livraisonId}`)
+        return
+      }
+
+      // Seulement si le statut n'est pas déjà paid/pending
+      if (livraison.paymentStatus !== 'pending' && livraison.paymentStatus !== 'paid') {
+        livraison.paymentStatus = 'pending'
+        livraison.paymentIntentId = paymentIntent.id
+        // Mettre à jour le montant si besoin
+        livraison.amount = paymentIntent.amount / 100
+        await livraison.save()
+        console.log(`✅ Livraison ${livraisonId} marquée comme pending (escrow prêt)`)
+      }
+    } catch (error) {
+      console.error('❌ Erreur markDeliveryPaymentPending:', error)
+    }
+  }
+
+  private static async handleWalletRecharge(pi: Stripe.PaymentIntent) {
+    try {
+      const utilisateurId = Number(pi.metadata?.utilisateur_id)
+      if (!utilisateurId) {
+        console.warn('⚠️ handleWalletRecharge: utilisateur_id manquant dans metadata')
+        return
+      }
+
+      const montantRecharge = pi.amount / 100
+
+      // Récupérer ou créer le portefeuille
+      let portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', utilisateurId)
+        .where('is_active', true)
+        .first()
+
+      if (!portefeuille) {
+        portefeuille = await PortefeuilleEcodeli.create({
+          utilisateurId: utilisateurId,
+          soldeDisponible: 0,
+          soldeEnAttente: 0,
+          isActive: true,
+        })
+      }
+
+      const ancienSolde = Number(portefeuille.soldeDisponible) || 0
+      const nouveauSolde = ancienSolde + montantRecharge
+      portefeuille.soldeDisponible = nouveauSolde
+      await portefeuille.save()
+
+      await TransactionPortefeuille.create({
+        portefeuilleId: portefeuille.id,
+        utilisateurId: utilisateurId,
+        typeTransaction: 'credit',
+        montant: montantRecharge,
+        soldeAvant: ancienSolde,
+        soldeApres: portefeuille.soldeDisponible,
+        description: `Recharge cagnotte via Stripe (webhook) - ${montantRecharge}€`,
+        referenceExterne: pi.id,
+        statut: 'completed',
+        metadata: JSON.stringify({
+          type: 'wallet_recharge',
+          stripe_payment_intent: pi.id,
+        }),
+      })
+
+      console.log(`✅ Wallet rechargé (webhook) pour user ${utilisateurId}: +${montantRecharge}€`)
+    } catch (error) {
+      console.error('❌ handleWalletRecharge error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Récupère le solde disponible/pending d'un compte Connect
+   */
+  static async getConnectBalance(
+    accountId: string
+  ): Promise<{ available: number; pending: number }> {
+    try {
+      const balance = await stripe.balance.retrieve({ stripeAccount: accountId })
+
+      const available =
+        (balance.available || [])
+          .filter((b) => b.currency === 'eur')
+          .reduce((sum, b) => sum + b.amount, 0) / 100
+      const pending =
+        (balance.pending || [])
+          .filter((b) => b.currency === 'eur')
+          .reduce((sum, b) => sum + b.amount, 0) / 100
+
+      return { available, pending }
+    } catch (error) {
+      console.error('❌ Erreur récupération balance Connect:', error)
       throw error
     }
   }

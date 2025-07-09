@@ -195,7 +195,7 @@ export default class StripeConnectController {
   }
 
   /**
-   * 💰 EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE
+   *  EFFECTUER UN VIREMENT DEPUIS LE PORTEFEUILLE
    * Transfert des fonds du portefeuille EcoDeli vers le compte Stripe Connect
    */
   async transferFromWallet({ request, response, auth }: HttpContext) {

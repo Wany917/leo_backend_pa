@@ -4,57 +4,61 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Utilisateurs from '#models/utilisateurs'
 
 export default class Rating extends BaseModel {
-  static table = 'ratings'
-
   @column({ isPrimary: true })
   declare id: number
 
-  @column()
-  declare reviewer_id: number
+  @column({ columnName: 'reviewer_id' })
+  declare reviewerId: number
 
-  @column()
-  declare reviewed_id: number
+  @column({ columnName: 'reviewed_id' })
+  declare reviewedId: number
 
-  @column()
-  declare rating_type: 'delivery' | 'service' | 'product'
+  @column({ columnName: 'rating_type' })
+  declare ratingType: 'delivery' | 'service' | 'product'
 
-  @column()
-  declare rating_for_id: number
+  @column({ columnName: 'rating_for_id' })
+  declare ratingForId: number
 
-  @column()
-  declare overall_rating: number
+  @column({ columnName: 'overall_rating' })
+  declare overallRating: number
 
-  @column()
-  declare punctuality_rating: number | null
+  @column({ columnName: 'punctuality_rating' })
+  declare punctualityRating: number | null
 
-  @column()
-  declare quality_rating: number | null
+  @column({ columnName: 'quality_rating' })
+  declare qualityRating: number | null
 
-  @column()
-  declare communication_rating: number | null
+  @column({ columnName: 'communication_rating' })
+  declare communicationRating: number | null
 
-  @column()
-  declare value_rating: number | null
+  @column({ columnName: 'value_rating' })
+  declare valueRating: number | null
 
   @column()
   declare comment: string | null
 
-  @column()
-  declare is_verified_purchase: boolean
+  @column({ columnName: 'is_verified_purchase' })
+  declare isVerifiedPurchase: boolean
 
-  @column()
-  declare is_visible: boolean
+  @column({ columnName: 'is_visible' })
+  declare isVisible: boolean
 
-  @column()
-  declare admin_response: string | null
+  @column({ columnName: 'admin_response' })
+  declare adminResponse: string | null
 
-  @column.dateTime()
-  declare admin_response_at: DateTime | null
+  @column.dateTime({ columnName: 'admin_response_at' })
+  declare adminResponseAt: DateTime | null
 
-  @belongsTo(() => Utilisateurs, { foreignKey: 'reviewer_id' })
+  @belongsTo(() => Utilisateurs, {
+    foreignKey: 'reviewerId',
+    localKey: 'id',
+  })
   declare reviewer: BelongsTo<typeof Utilisateurs>
 
-  @belongsTo(() => Utilisateurs, { foreignKey: 'reviewed_id' })
+  @belongsTo(() => Utilisateurs, {
+    foreignKey: 'reviewedId',
+    localKey: 'id',
+  })
   declare reviewed: BelongsTo<typeof Utilisateurs>
 
   @column.dateTime({ autoCreate: true })

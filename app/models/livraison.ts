@@ -93,7 +93,7 @@ export default class Livraison extends BaseModel {
     await this.load('colis' as any)
 
     // Notifier tous les livreurs disponibles
-    const availableLivreurs = await Livreur.query().where('availabilityStatus', 'available')
+    const availableLivreurs = await Livreur.query().where('disponible', true)
 
     const notification = {
       livraison: {

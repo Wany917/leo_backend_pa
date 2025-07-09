@@ -107,6 +107,11 @@ export default class CodeTemporairesController {
    * 2. Capturer le paiement Stripe (libérer l'escrow)
    * 3. Ajouter les fonds au portefeuille du livreur
    * 4. Mettre à jour le statut de la livraison
+   * Workflow selon cahier des charges page 15:
+   * 1. Vérifier le code de validation
+   * 2. Capturer le paiement Stripe (libérer l'escrow)
+   * 3. Ajouter les fonds au portefeuille du livreur
+   * 4. Mettre à jour le statut de la livraison
    */
   async validateDelivery({ request, response }: HttpContext) {
     try {
@@ -154,8 +159,23 @@ export default class CodeTemporairesController {
         })
       }
 
+      // 🚨 Si la livraison est déjà payée, on renvoie immédiatement un succès pour éviter les doublons
+      if (livraison.paymentStatus === 'paid') {
+        // Supprimer tout de même le code temporaire s'il existe
+        await CodeTemporaire.query().where('user_info', userInfo).where('code', code).delete()
+
+        return response.ok({
+          success: true,
+          message: 'Livraison déjà validée',
+          data: {
+            payment_status: 'paid',
+            livraison_id: livraison.id,
+          },
+        })
+      }
+
       const montantALiberer = livraison.amount || 0
-      console.log('💰 Montant à libérer depuis la livraison:', montantALiberer, '€')
+      console.log(' Montant à libérer depuis la livraison:', montantALiberer, '€')
 
       if (montantALiberer <= 0) {
         return response.badRequest({
@@ -315,11 +335,11 @@ export default class CodeTemporairesController {
 
   /**
    * Libérer les fonds pour une livraison
-   * Nouveau workflow escrow :
-   * 1. Récupérer ou créer le portefeuille du livreur
-   * 2. Ajouter les fonds en attente (venant de l'escrow Stripe)
-   * 3. Libérer immédiatement les fonds (les rendre disponibles)
-   * 4. Enregistrer les transactions
+   * NOUVEAU workflow escrow avec transfer direct + synchronisation portefeuille :
+   * 1. Vérifier que le livreur a un compte Stripe Connect configuré
+   * 2. Faire un transfer direct depuis le compte principal vers le compte Connect
+   * 3. 🔄 SYNCHRONISER le portefeuille virtuel pour refléter la réalité
+   * 4. Enregistrer les transactions avec les bons statuts
    */
   private async libererFondsLivraison(livraisonId: number, montantALiberer: number) {
     try {
@@ -329,7 +349,7 @@ export default class CodeTemporairesController {
         .preload('client')
         .firstOrFail()
 
-      console.log('💰 LIBÉRATION FONDS LIVRAISON - Montant:', montantALiberer, '€')
+      console.log(' LIBÉRATION FONDS LIVRAISON - Montant:', montantALiberer, '€')
 
       if (!montantALiberer) {
         throw new Error('Montant à libérer non défini')
@@ -339,13 +359,12 @@ export default class CodeTemporairesController {
         throw new Error('Livreur non trouvé')
       }
 
-      // Récupérer ou créer le portefeuille du livreur
+      // 📊 ÉTAPE 1: Créer/récupérer le portefeuille pour le suivi (toujours nécessaire)
       let portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', livraison.livreur.id)
         .where('is_active', true)
         .first()
 
-      // Créer le portefeuille s'il n'existe pas
       if (!portefeuille) {
         console.log('📝 Création du portefeuille pour le livreur:', livraison.livreur.id)
         portefeuille = await PortefeuilleEcodeli.create({
@@ -356,52 +375,112 @@ export default class CodeTemporairesController {
         })
       }
 
-      console.log('🔍 Portefeuille avant opération:', {
-        id: portefeuille.id,
-        soldeDisponible: portefeuille.soldeDisponible,
-        soldeEnAttente: portefeuille.soldeEnAttente,
-      })
+      // 🆕 ÉTAPE 2: Vérifier si le livreur a configuré Stripe Connect
+      const LivreurModel = await import('#models/livreur')
+      const Livreur = LivreurModel.default
+      const livreur = await Livreur.find(livraison.livreur.id)
 
-      // ÉTAPE 1: Ajouter les fonds en attente (venant de l'escrow Stripe)
-      await portefeuille.ajouterFondsEnAttente(montantALiberer)
-      console.log('✅ Fonds ajoutés en attente:', montantALiberer, '€')
+      const hasStripeConnect = livreur?.stripeAccountId
+      let accountReady = false
 
-      // ÉTAPE 2: Libérer immédiatement les fonds (les rendre disponibles)
-      await portefeuille.libererFonds(montantALiberer)
-      console.log('✅ Fonds libérés vers solde disponible:', montantALiberer, '€')
+      if (hasStripeConnect && livreur.stripeAccountId) {
+        try {
+          const StripeService = await import('#services/stripe_service')
+          const accountStatus = await StripeService.default.checkAccountStatus(
+            livreur.stripeAccountId
+          )
+          accountReady = accountStatus.payouts_enabled
+          console.log(
+            `🏦 Compte Connect ${livreur.stripeAccountId}: payouts_enabled=${accountReady}`
+          )
+        } catch (error) {
+          console.warn('⚠️ Erreur vérification compte Connect:', error.message)
+        }
+      }
 
-      // Recharger le portefeuille pour voir les changements finaux
-      await portefeuille.refresh()
-      console.log('🔍 Portefeuille après libération:', {
-        id: portefeuille.id,
-        soldeDisponible: portefeuille.soldeDisponible,
-        soldeEnAttente: portefeuille.soldeEnAttente,
-      })
+      // 🎯 ÉTAPE 3: Logique conditionnelle selon la configuration du livreur
+      if (hasStripeConnect && accountReady && livreur.stripeAccountId) {
+        //  CAS A: TRANSFER DIRECT (livreur a configuré son compte bancaire)
+        console.log(`🚀 Transfer direct vers compte Connect ${livreur.stripeAccountId}`)
 
-      // Enregistrer la transaction de libération
-      await TransactionPortefeuille.create({
-        portefeuilleId: portefeuille.id,
-        utilisateurId: livraison.livreur.id,
-        typeTransaction: 'liberation',
-        montant: montantALiberer,
-        soldeAvant: portefeuille.soldeDisponible - montantALiberer,
-        soldeApres: portefeuille.soldeDisponible,
-        description: `Libération fonds livraison #${livraison.id} après validation code`,
-        referenceExterne: livraison.paymentIntentId,
-        livraisonId: livraison.id,
-        statut: 'completed',
-        metadata: JSON.stringify({
-          type: 'escrow_release',
-          validated_at: new Date().toISOString(),
-          client_id: livraison.client?.id,
-        }),
-      })
+        try {
+          const StripeService = await import('#services/stripe_service')
+          const transferResult = await StripeService.default.transferFromWalletToDeliveryman(
+            montantALiberer,
+            livreur.stripeAccountId,
+            `Libération automatique fonds livraison #${livraisonId} après validation code`
+          )
 
-      console.log(
-        '✅ FONDS LIBÉRÉS - Livreur reçoit:',
-        montantALiberer,
-        '€ (maintenant disponible)'
-      )
+          console.log('✅ Transfer Stripe réussi:', transferResult.transfer_id)
+
+          // 🔄 SYNCHRONISATION PORTEFEUILLE: Marquer comme "transféré automatiquement"
+          await TransactionPortefeuille.create({
+            portefeuilleId: portefeuille.id,
+            utilisateurId: livraison.livreur.id,
+            typeTransaction: 'virement', // Type: virement automatique
+            montant: montantALiberer,
+            soldeAvant: portefeuille.soldeDisponible,
+            soldeApres: portefeuille.soldeDisponible, // Solde inchangé car transfer direct
+            description: ` Virement automatique livraison #${livraison.id} → compte bancaire`,
+            referenceExterne: transferResult.transfer_id,
+            livraisonId: livraison.id,
+            statut: 'completed',
+            metadata: JSON.stringify({
+              type: 'auto_bank_transfer',
+              stripe_account_id: livreur.stripeAccountId,
+              transfer_id: transferResult.transfer_id,
+              estimated_arrival: '1-3 jours ouvrés',
+              validated_at: new Date().toISOString(),
+              client_id: livraison.client?.id,
+              sync_mode: 'direct_transfer',
+            }),
+          })
+
+          console.log(
+            '✅ TRANSFER DIRECT RÉUSSI - Livreur recevra',
+            montantALiberer,
+            '€ directement sur son compte bancaire sous 1-3 jours'
+          )
+        } catch (transferError) {
+          console.error('❌ Erreur transfer direct:', transferError)
+          throw new Error(`Transfer automatique échoué: ${transferError.message}`)
+        }
+      } else {
+        // 🏪 CAS B: PORTEFEUILLE VIRTUEL (livreur n'a pas configuré de compte bancaire)
+        console.log('🏪 Ajout au portefeuille virtuel - Compte Connect non configuré')
+
+        // Ajouter les fonds au portefeuille pour virement manuel ultérieur
+        const ancienSolde = portefeuille.soldeDisponible
+        await portefeuille.ajouterFondsEnAttente(montantALiberer)
+        await portefeuille.libererFonds(montantALiberer)
+
+        await TransactionPortefeuille.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: livraison.livreur.id,
+          typeTransaction: 'liberation',
+          montant: montantALiberer,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: `💳 Fonds ajoutés au portefeuille - livraison #${livraison.id}`,
+          referenceExterne: livraison.paymentIntentId,
+          livraisonId: livraison.id,
+          statut: 'completed',
+          metadata: JSON.stringify({
+            type: 'wallet_credit',
+            reason: 'no_stripe_connect',
+            validated_at: new Date().toISOString(),
+            client_id: livraison.client?.id,
+            sync_mode: 'wallet_virtual',
+            next_step: 'manual_transfer_available',
+          }),
+        })
+
+        console.log(
+          '✅ FONDS AJOUTÉS AU PORTEFEUILLE - Livreur peut maintenant demander un virement manuel:',
+          montantALiberer,
+          '€ (disponible immédiatement)'
+        )
+      }
     } catch (error) {
       console.error('🔴 ERREUR LIBÉRATION FONDS LIVRAISON:', error)
       throw error
@@ -418,7 +497,7 @@ export default class CodeTemporairesController {
         .preload('prestataire')
         .firstOrFail()
 
-      console.log('💰 LIBÉRATION FONDS SERVICE - Montant:', service.price, '€')
+      console.log(' LIBÉRATION FONDS SERVICE - Montant:', service.price, '€')
 
       if (!service.prestataire?.id) {
         throw new Error('Prestataire non trouvé')

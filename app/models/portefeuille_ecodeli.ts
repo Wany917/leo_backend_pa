@@ -9,13 +9,13 @@ export default class PortefeuilleEcodeli extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  @column()
+  @column({ columnName: 'utilisateur_id' })
   declare utilisateurId: number
 
-  @column()
+  @column({ columnName: 'solde_disponible' })
   declare soldeDisponible: number
 
-  @column()
+  @column({ columnName: 'solde_en_attente' })
   declare soldeEnAttente: number
 
   @column()
@@ -24,13 +24,13 @@ export default class PortefeuilleEcodeli extends BaseModel {
   @column()
   declare bic: string | null
 
-  @column()
+  @column({ columnName: 'virement_auto_actif' })
   declare virementAutoActif: boolean
 
-  @column()
+  @column({ columnName: 'seuil_virement_auto' })
   declare seuilVirementAuto: number
 
-  @column()
+  @column({ columnName: 'is_active' })
   declare isActive: boolean
 
   @column.dateTime({ autoCreate: true })
@@ -60,7 +60,7 @@ export default class PortefeuilleEcodeli extends BaseModel {
     this.soldeEnAttente = currentSoldeEnAttente + montantToAdd
 
     console.log(
-      `💰 ajouterFondsEnAttente: ${currentSoldeEnAttente} + ${montantToAdd} = ${this.soldeEnAttente}`
+      ` ajouterFondsEnAttente: ${currentSoldeEnAttente} + ${montantToAdd} = ${this.soldeEnAttente}`
     )
     await this.save()
   }
@@ -84,7 +84,7 @@ export default class PortefeuilleEcodeli extends BaseModel {
     this.soldeDisponible = currentSoldeDisponible + montantNumeric
 
     console.log(
-      `💰 libererFonds: Nouveau solde en attente: ${this.soldeEnAttente}, Nouveau solde disponible: ${this.soldeDisponible}`
+      ` libererFonds: Nouveau solde en attente: ${this.soldeEnAttente}, Nouveau solde disponible: ${this.soldeDisponible}`
     )
     await this.save()
 

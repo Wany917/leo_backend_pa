@@ -41,7 +41,7 @@ export default class Livreur extends BaseModel {
   @column()
   declare enService: boolean
 
-  @column()
+  @column({ columnName: 'stripe_account_id' })
   declare stripeAccountId: string | null
 
   @belongsTo(() => Utilisateurs, {

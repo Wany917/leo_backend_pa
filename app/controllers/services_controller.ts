@@ -115,51 +115,25 @@ export default class ServicesController {
         requires_materials,
       } = await request.validateUsing(serviceValidator)
 
-      // Validate and parse datetime fields
-      let parsedStartDate: DateTime | undefined
-      let parsedEndDate: DateTime | undefined
-
-      if (startDate) {
-        parsedStartDate = DateTime.fromISO(startDate)
-        if (!parsedStartDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid start_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: startDate,
-          })
-        }
-      }
-
-      if (endDate) {
-        parsedEndDate = DateTime.fromISO(endDate)
-        if (!parsedEndDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid end_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: endDate,
-          })
-        }
-      }
-
-      // Validate that end_date is after start_date
-      if (parsedStartDate && parsedEndDate && parsedEndDate <= parsedStartDate) {
+      // Validate required fields
+      if (!name || !description || price === undefined || price === null || !location) {
         return response.status(400).send({
-          error_message: 'End date must be after start date',
+          error_message: 'Missing required fields: name, description, price, location are required',
         })
       }
 
-      // Validate required fields
-      if (!name || !description || !price || !location || !startDate || !endDate) {
+      // Validate price is a valid number >= 0
+      if (Number.isNaN(price) || price < 0) {
+        return response.status(400).send({
+          error_message: 'Price must be a non-negative number',
+        })
+      }
+
+      // For hourly pricing, price can be 0 but hourly_rate must be > 0
+      if (pricing_type === 'hourly' && price === 0 && (!hourly_rate || hourly_rate <= 0)) {
         return response.status(400).send({
           error_message:
-            'Missing required fields: name, description, price, location, start_date, end_date are required',
-        })
-      }
-
-      // Validate price is a positive number
-      if (Number.isNaN(price) || price <= 0) {
-        return response.status(400).send({
-          error_message: 'Price must be a positive number',
+            'For hourly pricing, hourly_rate must be a positive number when price is 0',
         })
       }
 
@@ -434,56 +408,26 @@ export default class ServicesController {
    */
   async getServiceProvidersMap({ request, response }: HttpContext) {
     try {
-      const { lat, lng, radius } = request.qs()
-      const latitude = lat ? Number.parseFloat(lat) : null
-      const longitude = lng ? Number.parseFloat(lng) : null
-      const radiusKm = radius ? Number.parseFloat(radius) : 10
-
-      // Validation des paramètres optionnels
-      if (latitude !== null && (Number.isNaN(latitude) || latitude < -90 || latitude > 90)) {
-        return response.status(400).send({
-          error_message: 'Invalid latitude (must be between -90 and 90)',
+      const providers = await Prestataire.query()
+        .preload('user')
+        .preload('services', (servicesQuery) => {
+          servicesQuery.where('is_active', true)
         })
-      }
 
-      if (longitude !== null && (Number.isNaN(longitude) || longitude < -180 || longitude > 180)) {
-        return response.status(400).send({
-          error_message: 'Invalid longitude (must be between -180 and 180)',
-        })
-      }
-
-      if (Number.isNaN(radiusKm) || radiusKm <= 0 || radiusKm > 100) {
-        return response.status(400).send({
-          error_message: 'Invalid radius (must be between 0 and 100 km)',
-        })
-      }
-
-      const providers = await Prestataire.query().preload('services', (servicesQuery) => {
-        servicesQuery.where('is_active', true)
-      })
-
-      // Charger les utilisateurs séparément avec une seule requête
-      const providerIds = providers.map((p) => p.id)
-      const users = await Utilisateurs.query().whereIn('id', providerIds)
-      const usersMap = new Map(users.map((u) => [u.id, u]))
-
-      const providersMap = providers.map((provider) => {
-        const user = usersMap.get(provider.id)
-        return {
-          id: provider.id,
-          name: user ? `${user.first_name} ${user.last_name}` : 'Prestataire inconnu',
-          email: user?.email,
-          city: user?.city,
-          service_type: provider.service_type,
-          rating: provider.rating,
-          active_services_count: provider.services?.length || 0,
-          coordinates: {
-            // TODO: Implémenter les coordonnées réelles des prestataires
-            lat: 48.8566 + (Math.random() - 0.5) * 0.1,
-            lng: 2.3522 + (Math.random() - 0.5) * 0.1,
-          },
-        }
-      })
+      const providersMap = providers.map((provider) => ({
+        id: provider.id,
+        name: provider.user?.first_name + ' ' + provider.user?.last_name,
+        email: provider.user?.email,
+        city: provider.user?.city,
+        service_type: provider.service_type,
+        rating: provider.rating,
+        active_services_count: provider.services?.length || 0,
+        coordinates: {
+          // Simulation - dans un vrai projet, géocoder l'adresse
+          lat: 48.8566 + (Math.random() - 0.5) * 0.1,
+          lng: 2.3522 + (Math.random() - 0.5) * 0.1,
+        },
+      }))
 
       return response.ok({
         center: latitude && longitude ? { lat: latitude, lng: longitude } : null,
@@ -857,7 +801,7 @@ export default class ServicesController {
   // ===============================================
 
   /**
-   * 💰 FINALISER SERVICE ET DISTRIBUER GAINS
+   *  FINALISER SERVICE ET DISTRIBUER GAINS
    * Marque un service comme terminé et distribue les gains au prestataire
    */
   async completeServiceAndDistributePayment({ request, response, auth }: HttpContext) {
