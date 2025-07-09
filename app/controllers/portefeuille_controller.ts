@@ -36,33 +36,6 @@ export default class PortefeuilleController {
         })
       }
 
-      // 🔄 Si l'utilisateur dispose d'un compte Stripe Connect, ajouter le solde live
-      let stripeBalance: { available: number; pending: number } | null = null
-
-      try {
-        // Rechercher un stripeAccountId dans les différents rôles
-        const clientModule = await import('#models/client')
-        const livreurModule = await import('#models/livreur')
-        const prestataireModule = await import('#models/prestataire')
-
-        const ClientModel = clientModule.default
-        const LivreurModel = livreurModule.default
-        const PrestataireModel = prestataireModule.default
-
-        const client: any = await ClientModel.find(userId)
-        const livreur: any = await LivreurModel.find(userId)
-        const prestataire: any = await PrestataireModel.find(userId)
-
-        const stripeAccountId =
-          client?.stripeAccountId || livreur?.stripeAccountId || prestataire?.stripeAccountId
-
-        if (stripeAccountId) {
-          stripeBalance = await StripeService.getConnectBalance(stripeAccountId)
-        }
-      } catch (balErr: any) {
-        console.warn('⚠️ Impossible de récupérer le solde Stripe Connect:', balErr.message)
-      }
-
       return response.ok({
         success: true,
         data: {
@@ -73,7 +46,6 @@ export default class PortefeuilleController {
           virementAutoActif: portefeuille.virementAutoActif,
           seuilVirementAuto: portefeuille.seuilVirementAuto,
           iban: portefeuille.iban ? `****${portefeuille.iban.slice(-4)}` : null,
-          stripe_balance: stripeBalance, // { available, pending } ou null
         },
       })
     } catch (error) {
@@ -261,7 +233,7 @@ export default class PortefeuilleController {
   // ===============================================
 
   /**
-   *  RECHARGER LA CAGNOTTE CLIENT
+   * 💰 RECHARGER LA CAGNOTTE CLIENT
    * Permet aux clients d'ajouter des fonds à leur cagnotte via Stripe
    */
   public async rechargerCagnotte({ request, response, auth }: HttpContext) {
@@ -359,8 +331,9 @@ export default class PortefeuilleController {
         })
       }
 
+      // Ajouter les fonds directement au solde disponible (pas d'escrow pour les recharges)
       const montantRecharge = paymentStatus.amount
-      const ancienSolde = Number(portefeuille.soldeDisponible) || 0
+      const ancienSolde = portefeuille.soldeDisponible
 
       portefeuille.soldeDisponible = ancienSolde + montantRecharge
       await portefeuille.save()
