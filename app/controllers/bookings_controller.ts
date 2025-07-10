@@ -17,43 +17,19 @@ export default class BookingsController {
       const limit = request.input('limit', 20)
       const status = request.input('status')
 
-      // Requête simplifiée avec des joins au lieu de preloads
-      let query = db
-        .from('bookings')
-        .select(
-          'bookings.*',
-          'utilisateurs.first_name as client_first_name',
-          'utilisateurs.last_name as client_last_name',
-          'utilisateurs.email as client_email',
-          'services.name as service_name',
-          'services.description as service_description'
-        )
-        .join('utilisateurs', 'bookings.client_id', 'utilisateurs.id')
-        .join('services', 'bookings.service_id', 'services.id')
-        .orderBy('bookings.created_at', 'desc')
+      let query = Booking.query()
+        .preload('client')
+        .preload('service', (serviceQuery) => {
+          serviceQuery.preload('prestataire').preload('serviceType')
+        })
 
       if (status) {
-        query = query.where('bookings.status', status)
+        query = query.where('status', status)
       }
 
-      const offset = (page - 1) * limit
-      const bookings = await query.limit(limit).offset(offset)
+      const bookings = await query.orderBy('created_at', 'desc').paginate(page, limit)
 
-      // Compter le total pour la pagination
-      const totalQuery = db.from('bookings')
-      if (status) {
-        totalQuery.where('status', status)
-      }
-      const total = await totalQuery.count('* as count').first()
-
-      return response.ok({
-        bookings: bookings,
-        pagination: {
-          page: page,
-          perPage: limit,
-          total: total?.count || 0,
-        },
-      })
+      return response.ok(bookings.toJSON())
     } catch (error) {
       console.error('Error fetching bookings:', error)
       return response.status(500).send({

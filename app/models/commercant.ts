@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Utilisateurs from '#models/utilisateurs'
-import Contract from './contract.ts'
+import Contract from '#models/contract'
 
 export default class Commercant extends BaseModel {
   @column({ isPrimary: true })

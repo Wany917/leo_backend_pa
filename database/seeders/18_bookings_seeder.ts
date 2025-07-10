@@ -28,6 +28,7 @@ export default class extends BaseSeeder {
         notes: 'Réservation en attente de validation',
         created_at: now,
         updated_at: now,
+        total_price: 100.0,
       },
       {
         client_id: clients[1]?.id,
@@ -37,6 +38,7 @@ export default class extends BaseSeeder {
         notes: 'Prestataire confirmé',
         created_at: now,
         updated_at: now,
+        total_price: 60.0,
       },
       {
         client_id: clients[2]?.id,
@@ -56,6 +58,7 @@ export default class extends BaseSeeder {
         notes: 'Client a annulé la réservation',
         created_at: now,
         updated_at: now,
+        total_price: 60.0,
       },
     ]
 

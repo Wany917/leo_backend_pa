@@ -300,7 +300,7 @@ router
     router
       .get('client-subscriptions', [SubscriptionsController, 'getAllClientsForAdmin'])
       .use([middleware.auth(), middleware.admin()])
-      
+
     router
       .delete('shopkeeper-deliveries/:id', [ShopkeeperDeliveriesController, 'deleteForAdmin'])
       .use([middleware.auth(), middleware.admin()])
@@ -342,9 +342,9 @@ router
       .use(middleware.auth())
 
     // Calendrier des prestataires
-    router
-      .get('prestataires/:prestataireId/calendar', [ServicesController, 'getProviderCalendar'])
-      .use(middleware.auth())
+    // router
+    //   .get('prestataires/:prestataireId/calendar', [AdminController, 'getProviderCalendar'])
+    //   .use(middleware.auth())
   })
   .prefix('admins')
 
@@ -673,52 +673,23 @@ router
   })
   .prefix('stripe')
 
+// Ratings
 router
   .group(() => {
-    // Lister tous les avis (Admin)
-    router.get('/', [RatingsController, 'index']).use([middleware.auth(), middleware.admin()])
-
-    // Créer une évaluation
-    router.post('/', [RatingsController, 'create']).use(middleware.auth())
-
-    // Récupérer les évaluations d'un utilisateur
+    // Public routes for ratings
     router.get('/user/:userId', [RatingsController, 'getByUser'])
-
-    // Récupérer les évaluations d'une livraison/service
     router.get('/:type/:itemId', [RatingsController, 'getByItem'])
+    router.get('/stats/:userId', [RatingsController, 'getStats'])
 
-    // 🌟 NOUVEAU: Vérifier si l'utilisateur connecté a déjà évalué un élément
+    // Authenticated user routes
+    router.post('/', [RatingsController, 'create']).use(middleware.auth())
     router
       .get('/check/:type/:itemId', [RatingsController, 'checkUserRating'])
       .use(middleware.auth())
-
-    // Statistiques des évaluations
-    router.get('/stats/:userId', [RatingsController, 'getStats'])
-
-    // Admin: Répondre à une évaluation
-    router
-      .post('/:ratingId/admin-response', [RatingsController, 'adminResponse'])
-      .use([middleware.auth(), middleware.admin()])
-
-    // Admin: Modérer une évaluation
-    router
-      .patch('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
-      .use([middleware.auth(), middleware.admin()])
-
-    // Admin: Modérer une évaluation (route POST alternative pour éviter problèmes CORS)
-    router
-      .post('/:ratingId/visibility', [RatingsController, 'toggleVisibility'])
-      .use([middleware.auth(), middleware.admin()])
   })
   .prefix('ratings')
 
 router.get('documents/:filename', [FilesController, 'downloadJustification'])
-
-router
-  .group(() => {
-    router.post('stripe/webhook', [StripeController, 'webhook'])
-  })
-  .prefix('api')
 
 router
   .group(() => {
@@ -737,3 +708,13 @@ router.get('/shopkeeper-deliveries/track/:trackingNumber', [
   'getTrackingInfo',
 ])
 router.post('/shopkeeper-deliveries/validate', [ShopkeeperDeliveriesController, 'validateDelivery'])
+
+router
+  .group(() => {
+    // Ratings Admin
+    router.get('/ratings', [RatingsController, 'index'])
+    router.put('/ratings/:id/response', [RatingsController, 'addAdminResponse'])
+    router.put('/ratings/:id/toggle-visibility', [RatingsController, 'toggleVisibility'])
+  })
+  .prefix('api/admin')
+  .use([middleware.auth(), middleware.admin()])
