@@ -46,12 +46,12 @@ export default class BookingsController {
    */
   async create({ request, response }: HttpContext) {
     try {
-      const { client_id, service_id, booking_date, notes } = request.body()
+      const { client_id, service_id, start_datetime, end_datetime, notes } = request.body()
 
       // Validation des données
-      if (!client_id || !service_id || !booking_date) {
+      if (!client_id || !service_id || !start_datetime || !end_datetime) {
         return response.status(400).send({
-          error_message: 'client_id, service_id et booking_date sont requis',
+          error_message: 'client_id, service_id, start_datetime et end_datetime sont requis',
         })
       }
 
@@ -77,18 +77,49 @@ export default class BookingsController {
         })
       }
 
-      // Convertir la date
-      const bookingDateTime = DateTime.fromISO(booking_date)
-      if (!bookingDateTime.isValid) {
+      // Convertir les dates
+      const startDateTime = DateTime.fromISO(start_datetime)
+      const endDateTime = DateTime.fromISO(end_datetime)
+
+      if (!startDateTime.isValid || !endDateTime.isValid) {
         return response.status(400).send({
           error_message: 'Format de date invalide. Utilisez le format ISO 8601',
         })
       }
 
-      // Vérifier que la date n'est pas dans le passé
-      if (bookingDateTime < DateTime.now()) {
+      // Vérifier que la date de fin est après la date de début
+      if (endDateTime <= startDateTime) {
         return response.status(400).send({
-          error_message: 'La date de réservation ne peut pas être dans le passé',
+          error_message: 'La date de fin doit être après la date de début',
+        })
+      }
+
+      // Vérifier que la date de début n'est pas dans le passé
+      if (startDateTime < DateTime.now()) {
+        return response.status(400).send({
+          error_message: 'La date de début ne peut pas être dans le passé',
+        })
+      }
+
+      // Vérifier les conflits de réservation
+      const conflictingBooking = await Booking.query()
+        .where('service_id', service_id)
+        .where('status', '!=', 'cancelled')
+        .where((query) => {
+          query
+            .whereBetween('start_datetime', [startDateTime.toSQL(), endDateTime.toSQL()])
+            .orWhereBetween('end_datetime', [startDateTime.toSQL(), endDateTime.toSQL()])
+            .orWhere((subQuery) => {
+              subQuery
+                .where('start_datetime', '<=', startDateTime.toSQL())
+                .where('end_datetime', '>=', endDateTime.toSQL())
+            })
+        })
+        .first()
+
+      if (conflictingBooking) {
+        return response.status(409).send({
+          error_message: 'Ce créneau horaire est déjà réservé',
         })
       }
 
@@ -96,7 +127,8 @@ export default class BookingsController {
       const booking = await Booking.create({
         clientId: client_id,
         serviceId: service_id,
-        bookingDate: bookingDateTime,
+        startDatetime: startDateTime,
+        endDatetime: endDateTime,
         notes: notes || null,
         status: 'pending',
         totalPrice: service.price,
@@ -104,7 +136,15 @@ export default class BookingsController {
 
       return response.created({
         message: 'Booking créé avec succès',
-        booking: booking,
+        booking: {
+          id: booking.id,
+          start_datetime: booking.startDatetime.toISO(),
+          end_datetime: booking.endDatetime.toISO(),
+          duration_hours: booking.getDurationInHours(),
+          status: booking.status,
+          notes: booking.notes,
+          total_price: booking.totalPrice,
+        },
       })
     } catch (error) {
       console.error('Error creating booking:', error)
@@ -232,7 +272,7 @@ export default class BookingsController {
         )
         .join('services', 'bookings.service_id', 'services.id')
         .where('bookings.client_id', clientId)
-        .orderBy('bookings.booking_date', 'desc')
+        .orderBy('bookings.start_datetime', 'desc')
 
       if (status) {
         query = query.where('bookings.status', status)
@@ -246,6 +286,44 @@ export default class BookingsController {
     } catch (error) {
       return response.status(500).send({
         error_message: 'Failed to fetch client bookings',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * @tag Bookings - Utilisateur
+   * @summary Récupérer les bookings de l'utilisateur connecté
+   * @description Liste tous les bookings de l'utilisateur connecté
+   */
+  async getUserBookings({ auth, request, response }: HttpContext) {
+    try {
+      const user = auth.user!
+      const status = request.input('status')
+
+      let query = db
+        .from('bookings')
+        .select(
+          'bookings.*',
+          'services.name as service_name',
+          'services.description as service_description'
+        )
+        .join('services', 'bookings.service_id', 'services.id')
+        .where('bookings.client_id', user.id)
+        .orderBy('bookings.start_datetime', 'desc')
+
+      if (status) {
+        query = query.where('bookings.status', status)
+      }
+
+      const bookings = await query
+
+      return response.ok({
+        bookings: bookings,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        error_message: 'Failed to fetch user bookings',
         error: error.message,
       })
     }
@@ -272,7 +350,7 @@ export default class BookingsController {
         .join('services', 'bookings.service_id', 'services.id')
         .join('utilisateurs', 'bookings.client_id', 'utilisateurs.id')
         .where('services.prestataireId', prestataireId)
-        .orderBy('bookings.booking_date', 'desc')
+        .orderBy('bookings.start_datetime', 'desc')
 
       return response.ok({
         bookings: bookings,
@@ -323,7 +401,7 @@ export default class BookingsController {
         .from('bookings')
         .join('services', 'bookings.service_id', 'services.id')
         .where('bookings.status', 'completed')
-        .whereBetween('bookings.booking_date', [currentMonth.toSQL()!, nextMonth.toSQL()!])
+        .whereBetween('bookings.start_datetime', [currentMonth.toSQL()!, nextMonth.toSQL()!])
         .sum('services.price as revenue')
         .first()
 
@@ -366,6 +444,89 @@ export default class BookingsController {
       return response.status(500).send({
         error_message: 'Failed to fetch booking stats',
         error: error.message,
+      })
+    }
+  }
+
+  /**
+   * @tag Bookings - Availability
+   * @summary Obtenir les créneaux disponibles pour un service
+   * @description Récupère les créneaux disponibles pour un service à une date donnée
+   */
+  async getAvailableSlots({ request, response }: HttpContext) {
+    try {
+      const serviceId = request.param('serviceId')
+      const date = request.input('date') // Format: YYYY-MM-DD
+
+      if (!date) {
+        return response.status(400).send({
+          error_message: 'Le paramètre date est requis (format: YYYY-MM-DD)',
+        })
+      }
+
+      const service = await Service.findOrFail(serviceId)
+      const targetDate = DateTime.fromISO(date)
+
+      if (!targetDate.isValid) {
+        return response.status(400).send({
+          error_message: 'Format de date invalide. Utilisez YYYY-MM-DD',
+        })
+      }
+
+      // Récupérer les réservations existantes pour cette date
+      const existingBookings = await Booking.query()
+        .where('service_id', serviceId)
+        .where('status', '!=', 'cancelled')
+        .whereBetween('start_datetime', [
+          targetDate.startOf('day').toSQL(),
+          targetDate.endOf('day').toSQL(),
+        ])
+        .orderBy('start_datetime', 'asc')
+
+      // Générer les créneaux disponibles (9h-18h par créneaux de 2h)
+      const availableSlots = []
+      const workingHours = {
+        start: 9,
+        end: 18,
+        slotDuration: 2, // heures
+      }
+
+      for (
+        let hour = workingHours.start;
+        hour < workingHours.end;
+        hour += workingHours.slotDuration
+      ) {
+        const slotStart = targetDate.set({ hour, minute: 0, second: 0 })
+        const slotEnd = slotStart.plus({ hours: workingHours.slotDuration })
+
+        // Vérifier si ce créneau est libre
+        const isAvailable = !existingBookings.some((booking) => {
+          return (
+            (booking.startDatetime <= slotStart && booking.endDatetime > slotStart) ||
+            (booking.startDatetime < slotEnd && booking.endDatetime >= slotEnd) ||
+            (booking.startDatetime >= slotStart && booking.endDatetime <= slotEnd)
+          )
+        })
+
+        availableSlots.push({
+          start_datetime: slotStart.toISO(),
+          end_datetime: slotEnd.toISO(),
+          available: isAvailable && slotStart > DateTime.now(),
+        })
+      }
+
+      return response.ok({
+        service: {
+          id: service.id,
+          title: service.title,
+        },
+        date: targetDate.toISODate(),
+        available_slots: availableSlots,
+      })
+    } catch (error) {
+      console.error('Get available slots error:', error)
+      return response.status(500).send({
+        error_message: 'Failed to fetch available slots',
       })
     }
   }

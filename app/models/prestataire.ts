@@ -75,51 +75,6 @@ export default class Prestataire extends BaseModel {
   }
 
   /**
-   * Calcule les créneaux disponibles pour le mois
-   */
-  async getAvailabilityForMonth(month?: number, year?: number): Promise<any[]> {
-    const targetMonth = month || DateTime.now().month
-    const targetYear = year || DateTime.now().year
-
-    const startOfMonth = DateTime.fromObject({ year: targetYear, month: targetMonth, day: 1 })
-    const endOfMonth = startOfMonth.endOf('month')
-
-    // Récupérer tous les services du mois
-    const services = await Service.query()
-      .where('prestataireId', this.id)
-      .whereBetween('start_date', [startOfMonth.toSQL()!, endOfMonth.toSQL()!])
-      .orderBy('start_date', 'asc')
-
-    const availability = []
-    let currentDate = startOfMonth
-
-    while (currentDate <= endOfMonth) {
-      // Ignorer les dimanches
-      if (currentDate.weekday !== 7) {
-        const dayServices = services.filter((service) =>
-          service.start_date.hasSame(currentDate, 'day')
-        )
-
-        availability.push({
-          date: currentDate.toISODate(),
-          is_available: dayServices.length < 3, // Max 3 services par jour
-          services_count: dayServices.length,
-          services: dayServices.map((service) => ({
-            id: service.id,
-            name: service.name,
-            start_time: service.start_date.toFormat('HH:mm'),
-            end_time: service.end_date.toFormat('HH:mm'),
-          })),
-        })
-      }
-
-      currentDate = currentDate.plus({ days: 1 })
-    }
-
-    return availability
-  }
-
-  /**
    * Met à jour la note moyenne du prestataire basée sur les vrais avis
    */
   async updateRating(): Promise<void> {

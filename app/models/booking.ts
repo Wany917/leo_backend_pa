@@ -14,8 +14,11 @@ export default class Booking extends BaseModel {
   @column({ columnName: 'service_id' })
   declare serviceId: number
 
-  @column.dateTime({ columnName: 'booking_date' })
-  declare bookingDate: DateTime
+  @column.dateTime({ columnName: 'start_datetime' })
+  declare startDatetime: DateTime
+
+  @column.dateTime({ columnName: 'end_datetime' })
+  declare endDatetime: DateTime
 
   @column()
   declare status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
@@ -48,13 +51,36 @@ export default class Booking extends BaseModel {
    */
   canBeCancelled(): boolean {
     const now = DateTime.now()
-    const bookingDate = this.bookingDate
+    const startDatetime = this.startDatetime
 
     // Peut être annulé si c'est au moins 24h avant
     return (
       this.status === 'pending' ||
-      (this.status === 'confirmed' && bookingDate.diff(now, 'hours').hours > 24)
+      (this.status === 'confirmed' && startDatetime.diff(now, 'hours').hours > 24)
     )
+  }
+
+  /**
+   * Calcule la durée du service en heures
+   */
+  getDurationInHours(): number {
+    return this.endDatetime.diff(this.startDatetime, 'hours').hours
+  }
+
+  /**
+   * Vérifie si le booking est en cours
+   */
+  isInProgress(): boolean {
+    const now = DateTime.now()
+    return now >= this.startDatetime && now <= this.endDatetime
+  }
+
+  /**
+   * Vérifie si le booking est terminé
+   */
+  isFinished(): boolean {
+    const now = DateTime.now()
+    return now > this.endDatetime
   }
 
   /**

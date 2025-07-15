@@ -18,8 +18,6 @@ export default class LivreursController {
 
       const livreur = await Livreur.create({
         id: utilisateurId,
-        availabilityStatus: 'available',
-        rating: null,
       })
 
       return response.created({
@@ -286,47 +284,11 @@ export default class LivreursController {
           completedLivraisons: Number(completedCount[0].$extras.total),
           inProgressLivraisons: Number(inProgressCount[0].$extras.total),
           cancelledLivraisons: Number(cancelledCount[0].$extras.total),
-          rating: livreur.rating,
-          availabilityStatus: livreur.availabilityStatus,
-          // totalRevenue: totalRevenue, // À implémenter selon votre logique
         },
       })
     } catch (error) {
       return response.badRequest({
         message: 'Erreur lors de la récupération des statistiques',
-        error_code: error,
-      })
-    }
-  }
-
-  /**
-   * Mettre à jour le statut de disponibilité du livreur
-   */
-  async updateAvailability({ request, response }: HttpContext) {
-    try {
-      const livreurId = request.param('id')
-      const { availabilityStatus } = request.body()
-
-      const livreur = await Livreur.findOrFail(livreurId)
-
-      // Valider le statut
-      const validStatuses = ['available', 'busy', 'offline']
-      if (!validStatuses.includes(availabilityStatus)) {
-        return response.badRequest({
-          message: 'Statut de disponibilité invalide',
-        })
-      }
-
-      livreur.availabilityStatus = availabilityStatus
-      await livreur.save()
-
-      return response.ok({
-        message: 'Statut de disponibilité mis à jour',
-        livreur: livreur.serialize(),
-      })
-    } catch (error) {
-      return response.badRequest({
-        message: 'Erreur lors de la mise à jour du statut de disponibilité',
         error_code: error,
       })
     }

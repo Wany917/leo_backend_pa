@@ -6,17 +6,10 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table
-        .integer('utilisateur_id')
         .unsigned()
         .references('id')
         .inTable('utilisateurs')
         .onDelete('CASCADE')
-      table.string('numero_permis').nullable()
-      table.string('type_vehicule').nullable()
-      table.string('plaque_immatriculation').nullable()
-      table.string('numero_assurance').nullable()
-      table.date('date_expiration_assurance').nullable()
       table.boolean('disponible').defaultTo(true)
       table.decimal('latitude', 10, 8).nullable()
       table.decimal('longitude', 11, 8).nullable()

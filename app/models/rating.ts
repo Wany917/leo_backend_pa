@@ -22,23 +22,8 @@ export default class Rating extends BaseModel {
   @column({ columnName: 'overall_rating' })
   declare overallRating: number
 
-  @column({ columnName: 'punctuality_rating' })
-  declare punctualityRating: number | null
-
-  @column({ columnName: 'quality_rating' })
-  declare qualityRating: number | null
-
-  @column({ columnName: 'communication_rating' })
-  declare communicationRating: number | null
-
-  @column({ columnName: 'value_rating' })
-  declare valueRating: number | null
-
   @column()
   declare comment: string | null
-
-  @column({ columnName: 'is_verified_purchase' })
-  declare isVerifiedPurchase: boolean
 
   @column({ columnName: 'is_visible' })
   declare isVisible: boolean

@@ -8,9 +8,6 @@ export default class extends BaseSchema {
       table.increments('id')
       table.string('store_name').notNullable()
       table.string('business_address').nullable()
-      table.string('contact_number', 20).nullable()
-      table.date('contract_start_date').notNullable()
-      table.date('contract_end_date').notNullable()
       table
         .enum('verification_state', ['pending', 'verified', 'rejected'])
         .notNullable()

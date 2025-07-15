@@ -46,7 +46,7 @@ export default class AdminController {
    */
   async create({ request, response }: HttpContext) {
     try {
-      const { id } = await request.validateUsing(adminValidator)
+      const { id, privileges } = await request.validateUsing(adminValidator)
 
       // Vérifier si l'utilisateur existe
       const user = await Utilisateurs.find(id)
@@ -63,7 +63,7 @@ export default class AdminController {
       // Créer l'admin avec privilège par défaut
       const admin = await Admin.create({
         id,
-        privileges: 'basic',
+        privileges,
       })
 
       // Récupérer les données complètes avec une requête JOIN
@@ -142,8 +142,6 @@ export default class AdminController {
             case 'livreur':
               await Livreur.create({
                 id: user.id,
-                availabilityStatus: 'available',
-                rating: null,
               })
               break
             case 'commercant':

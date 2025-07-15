@@ -4,7 +4,8 @@ export const createBookingValidator = vine.compile(
   vine.object({
     client_id: vine.number().positive(),
     service_id: vine.number().positive(),
-    booking_date: vine.date(),
+    start_datetime: vine.date().after('today'),
+    end_datetime: vine.date().after('today'),
     notes: vine.string().optional(),
     total_price: vine.number().positive().optional(),
     duration: vine.number().positive().optional(),

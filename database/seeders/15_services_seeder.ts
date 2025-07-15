@@ -39,7 +39,7 @@ export default class extends BaseSeeder {
         service_type_id: 2, // Services ménagers
         pricing_type: 'hourly' as const,
         hourly_rate: 25.0,
-        availability_description: 'Lundi au vendredi 9h-18h, weekend sur demande',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 15 }),
@@ -58,7 +58,7 @@ export default class extends BaseSeeder {
         service_type_id: 2, // Services ménagers
         pricing_type: 'fixed' as const,
         hourly_rate: null,
-        availability_description: 'Mardi, jeudi, samedi 14h-19h',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 10 }),
@@ -81,7 +81,7 @@ export default class extends BaseSeeder {
         service_type_id: 7, // Garde d'enfants
         pricing_type: 'hourly' as const,
         hourly_rate: 15.0,
-        availability_description: 'Disponible soirs de semaine après 17h et weekends',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 8 }),
@@ -100,7 +100,7 @@ export default class extends BaseSeeder {
         service_type_id: 1, // Transport de personnes
         pricing_type: 'hourly' as const,
         hourly_rate: 20.0,
-        availability_description: 'Lundi au samedi 8h-20h',
+
         home_service: false, // Sorties extérieures
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 20 }),
@@ -123,7 +123,7 @@ export default class extends BaseSeeder {
         service_type_id: 5, // Bricolage et jardinage
         pricing_type: 'custom' as const, // Devis selon travaux
         hourly_rate: 35.0,
-        availability_description: 'Interventions sur rendez-vous, délai 48h',
+
         home_service: true,
         requires_materials: true, // Selon travaux
         createdAt: DateTime.now().minus({ days: 5 }),
@@ -142,7 +142,7 @@ export default class extends BaseSeeder {
         service_type_id: 5, // Bricolage et jardinage
         pricing_type: 'fixed' as const,
         hourly_rate: null,
-        availability_description: 'Urgences 7j/7, interventions planifiées semaine',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 30 }),
@@ -165,7 +165,7 @@ export default class extends BaseSeeder {
         service_type_id: 8, // Cours particuliers
         pricing_type: 'hourly' as const,
         hourly_rate: 30.0,
-        availability_description: 'Créneaux disponibles mercredi après-midi et weekend',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 12 }),
@@ -187,7 +187,7 @@ export default class extends BaseSeeder {
         service_type_id: 10, // Autres services
         pricing_type: 'fixed' as const,
         hourly_rate: null,
-        availability_description: 'Suspendu temporairement',
+
         home_service: true,
         requires_materials: false,
         createdAt: DateTime.now().minus({ days: 3 }),

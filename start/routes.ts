@@ -122,7 +122,6 @@ router
       .put(':id/livraisons/:livraisonId/status', [LivreurController, 'updateLivraisonStatus'])
       .use(middleware.auth())
     router.get(':id/stats', [LivreurController, 'getStats']).use(middleware.auth())
-    router.put(':id/availability', [LivreurController, 'updateAvailability']).use(middleware.auth())
 
     // Routes for shopkeeper deliveries available to livreurs
     router
@@ -343,7 +342,7 @@ router
 
     // Calendrier des prestataires
     // router
-    //   .get('prestataires/:prestataireId/calendar', [AdminController, 'getProviderCalendar'])
+
     //   .use(middleware.auth())
   })
   .prefix('admins')
@@ -508,6 +507,10 @@ router
     // Routes publiques/CRUD basiques
     router.get('/', [BookingsController, 'index']).use(middleware.auth())
     router.post('/', [BookingsController, 'create']).use(middleware.auth())
+    
+    // Route spécifique pour les bookings utilisateur (doit être avant :id)
+    router.get('user', [BookingsController, 'getUserBookings']).use(middleware.auth())
+    
     router.get(':id', [BookingsController, 'show']).use(middleware.auth())
     router.put(':id/status', [BookingsController, 'updateStatus']).use(middleware.auth())
 
@@ -518,6 +521,9 @@ router
     router
       .get('provider/:prestataireId', [BookingsController, 'getProviderBookings'])
       .use(middleware.auth())
+
+    // Routes pour la disponibilité des créneaux
+    router.get('services/:serviceId/available-slots', [BookingsController, 'getAvailableSlots'])
 
     // Statistiques admin
     router
@@ -677,6 +683,7 @@ router
 router
   .group(() => {
     // Public routes for ratings
+    router.get('/', [RatingsController, 'getAllRatings']).use(middleware.auth())
     router.get('/user/:userId', [RatingsController, 'getByUser'])
     router.get('/:type/:itemId', [RatingsController, 'getByItem'])
     router.get('/stats/:userId', [RatingsController, 'getStats'])

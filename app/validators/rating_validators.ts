@@ -6,10 +6,6 @@ export const createRatingValidator = vine.compile(
     rating_type: vine.enum(['delivery', 'service', 'product']),
     rating_for_id: vine.number().positive(), // ID de la livraison/service/produit
     overall_rating: vine.number().min(1).max(5),
-    punctuality_rating: vine.number().min(1).max(5).optional(),
-    quality_rating: vine.number().min(1).max(5).optional(),
-    communication_rating: vine.number().min(1).max(5).optional(),
-    value_rating: vine.number().min(1).max(5).optional(),
     comment: vine.string().maxLength(1000).optional(),
   })
 )

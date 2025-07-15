@@ -13,24 +13,18 @@ export default class CommercantsController {
     try {
       console.log('🟡 AVANT VALIDATION...')
       const {
-        utilisateur_id: utilisateurId,
-        store_name: storeName,
-        business_address: businessAddress,
-        contact_number: contactNumber,
-        contract_start_date: contractStartDate,
-        contract_end_date: contractEndDate,
+        utilisateur_id,
+        store_name,
+        business_address,
       } = await request.validateUsing(commercantValidator)
 
       console.log('🟡 VALIDATION RÉUSSIE, données extraites:', {
-        utilisateurId,
-        storeName,
-        businessAddress,
-        contactNumber,
-        contractStartDate,
-        contractEndDate,
+        utilisateur_id,
+        store_name,
+        business_address,
       })
 
-      const commercantAlreadyLinked = await Commercant.find(utilisateurId)
+      const commercantAlreadyLinked = await Commercant.find(utilisateur_id)
       if (commercantAlreadyLinked) {
         console.log('🟡 Commercant déjà existant')
         return response.badRequest({ message: 'Utilisateur already has a Commercant account' })
@@ -38,13 +32,10 @@ export default class CommercantsController {
 
       console.log('🟡 CRÉATION DU COMMERCANT...')
       const commercant = await Commercant.create({
-        id: utilisateurId,
-        storeName: storeName,
-        businessAddress: businessAddress || null,
+        id: utilisateur_id,
+        storeName: store_name,
+        businessAddress: business_address || null,
         verificationState: 'pending',
-        contactNumber: contactNumber,
-        contractStartDate: DateTime.fromISO(contractStartDate),
-        contractEndDate: DateTime.fromISO(contractEndDate),
       })
 
       console.log('🟡 COMMERCANT CRÉÉ AVEC SUCCÈS:', commercant.serialize())
@@ -88,8 +79,6 @@ export default class CommercantsController {
     try {
       const commercant = await Commercant.findOrFail(request.param('id'))
       commercant.verificationState = 'verified'
-      commercant.contractStartDate = DateTime.now()
-      commercant.contractEndDate = DateTime.now().plus({ years: 1 })
       await commercant.save()
       return response.ok({
         message: 'Commercant verified successfully',

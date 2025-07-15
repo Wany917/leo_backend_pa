@@ -7,8 +7,57 @@ import Service from '#models/service'
 import { createRatingValidator, adminRatingResponseValidator } from '#validators/rating_validators'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
+import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class RatingsController {
+  /**
+   * @tag Ratings - Public
+   * @summary Lister tous les ratings (public)
+   * @description Récupère tous les ratings avec les relations nécessaires pour les utilisateurs authentifiés.
+   */
+  async getAllRatings({ response }: HttpContext) {
+    try {
+      const ratings = await Rating.query()
+        .preload('reviewer')
+        .preload('reviewed')
+        .orderBy('created_at', 'desc')
+
+      const ratingsWithDetails = await Promise.all(
+        ratings.map(async (rating) => {
+          let itemName = `Item #${rating.ratingForId}`
+          if (rating.ratingType === 'service') {
+            const service = await Service.find(rating.ratingForId)
+            if (service) itemName = service.name
+          } else if (rating.ratingType === 'delivery') {
+            const delivery = await Livraison.find(rating.ratingForId)
+            if (delivery) itemName = `Livraison #${delivery.id}`
+          }
+
+          console.log("Reviewed : ", rating.reviewed.first_name)
+
+          // Ajouter le nom et prénom de l'utilisateur reviewed
+          const reviewedUserName = rating.reviewed 
+            ? `${rating.reviewed.first_name} ${rating.reviewed.last_name}`
+            : 'Utilisateur inconnu'
+
+          return {
+            ...rating.serialize(),
+            itemName: itemName,
+            reviewedUserName: reviewedUserName,
+          }
+        })
+      )
+
+      return response.ok(ratingsWithDetails)
+    } catch (error) {
+      console.error('Error fetching ratings:', error)
+      return response.status(500).send({
+        error_message: 'Failed to fetch ratings',
+        error: error.message,
+      })
+    }
+  }
+
   /**
    * @tag Ratings - Admin
    * @summary Lister tous les ratings pour l'admin
@@ -32,9 +81,15 @@ export default class RatingsController {
             if (delivery) itemName = `Livraison #${delivery.id}`
           }
 
+          // Ajouter le nom et prénom de l'utilisateur reviewed
+          const reviewedUserName = rating.reviewed 
+            ? `${rating.reviewed.first_name} ${rating.reviewed.last_name}`
+            : 'Utilisateur inconnu'
+
           return {
             ...rating.serialize(),
             itemName: itemName,
+            reviewedUserName: reviewedUserName,
           }
         })
       )
@@ -89,12 +144,7 @@ export default class RatingsController {
         ratingType: data.rating_type,
         ratingForId: data.rating_for_id,
         overallRating: data.overall_rating,
-        punctualityRating: data.punctuality_rating,
-        qualityRating: data.quality_rating,
-        communicationRating: data.communication_rating,
-        valueRating: data.value_rating,
         comment: data.comment,
-        isVerifiedPurchase: true,
       })
 
       // Mettre à jour le rating moyen du livreur/prestataire
@@ -250,9 +300,6 @@ export default class RatingsController {
           ? {
               id: existingRating.id,
               overall_rating: existingRating.overallRating,
-              punctuality_rating: existingRating.punctualityRating,
-              quality_rating: existingRating.qualityRating,
-              communication_rating: existingRating.communicationRating,
               comment: existingRating.comment,
               created_at: existingRating.createdAt,
             }
@@ -292,7 +339,7 @@ export default class RatingsController {
       const rating = await Rating.findOrFail(ratingId)
 
       rating.adminResponse = adminResponse
-      rating.adminResponseAt = new Date()
+      rating.adminResponseAt = DateTime.now()
       await rating.save()
 
       return response.ok({
@@ -423,13 +470,7 @@ export default class RatingsController {
 
       const average = Number(avgRating?.$extras.average || 0)
 
-      if (ratingType === 'delivery') {
-        const livreur = await Livreur.find(userId)
-        if (livreur) {
-          livreur.rating = Math.round(average * 10) / 10 // Arrondir à 1 décimale
-          await livreur.save()
-        }
-      } else if (ratingType === 'service') {
+      if (ratingType === 'service') {
         const prestataire = await Prestataire.find(userId)
         if (prestataire) {
           prestataire.rating = Math.round(average * 10) / 10
@@ -455,18 +496,10 @@ export default class RatingsController {
       const [
         totalRatings,
         averageOverall,
-        averagePunctuality,
-        averageQuality,
-        averageCommunication,
-        averageValue,
         ratingDistribution,
       ] = await Promise.all([
         query.clone().count('* as total'),
         query.clone().avg('overall_rating as average'),
-        query.clone().avg('punctuality_rating as average'),
-        query.clone().avg('quality_rating as average'),
-        query.clone().avg('communication_rating as average'),
-        query.clone().avg('value_rating as average'),
         query
           .clone()
           .select('overall_rating')
@@ -479,11 +512,6 @@ export default class RatingsController {
         total_ratings: Number(totalRatings[0].$extras.total),
         averages: {
           overall: Math.round((Number(averageOverall[0].$extras.average) || 0) * 10) / 10,
-          punctuality: Math.round((Number(averagePunctuality[0].$extras.average) || 0) * 10) / 10,
-          quality: Math.round((Number(averageQuality[0].$extras.average) || 0) * 10) / 10,
-          communication:
-            Math.round((Number(averageCommunication[0].$extras.average) || 0) * 10) / 10,
-          value: Math.round((Number(averageValue[0].$extras.average) || 0) * 10) / 10,
         },
         distribution: ratingDistribution.map((item) => ({
           rating: item.overallRating,
@@ -496,10 +524,6 @@ export default class RatingsController {
         total_ratings: 0,
         averages: {
           overall: 0,
-          punctuality: 0,
-          quality: 0,
-          communication: 0,
-          value: 0,
         },
         distribution: [],
       }

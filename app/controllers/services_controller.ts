@@ -75,7 +75,7 @@ export default class ServicesController {
           hourly_rate: service.hourly_rate,
           location: service.location,
           status: service.status,
-          availability_description: service.availability_description,
+
           home_service: service.home_service,
           requires_materials: service.requires_materials,
           duration: service.duration,
@@ -84,8 +84,12 @@ export default class ServicesController {
           prestataireEmail: user?.email,
           prestataireRating: service.prestataire?.rating,
           serviceTypeName: service.serviceType?.name || null,
+          prestataireId: service.prestataireId,
         }
       })
+
+      console.log('Backend services_controller.ts - Raw services from DB:', services.map(s => ({ id: s.id, prestataireId: s.prestataireId, name: s.name })));
+      console.log('Backend services_controller.ts - Mapped services:', mappedServices.map(s => ({ id: s.id, prestataireId: s.prestataireId, name: s.name })));
 
       return response.ok(mappedServices)
     } catch (error) {
@@ -110,46 +114,13 @@ export default class ServicesController {
         location,
         status,
         duration,
-        availability_description,
+
         home_service,
         requires_materials,
       } = await request.validateUsing(serviceValidator)
 
-      // Validate and parse datetime fields
-      let parsedStartDate: DateTime | undefined
-      let parsedEndDate: DateTime | undefined
-
-      if (startDate) {
-        parsedStartDate = DateTime.fromISO(startDate)
-        if (!parsedStartDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid start_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: startDate,
-          })
-        }
-      }
-
-      if (endDate) {
-        parsedEndDate = DateTime.fromISO(endDate)
-        if (!parsedEndDate.isValid) {
-          return response.status(400).send({
-            error_message:
-              'Invalid end_date format. Expected ISO 8601 format (YYYY-MM-DDTHH:mm:ss)',
-            received: endDate,
-          })
-        }
-      }
-
-      // Validate that end_date is after start_date
-      if (parsedStartDate && parsedEndDate && parsedEndDate <= parsedStartDate) {
-        return response.status(400).send({
-          error_message: 'End date must be after start date',
-        })
-      }
-
       // Validate required fields
-      if (!name || !description || !price || !location || !startDate || !endDate) {
+      if (!name || !description || !price || !location) {
         return response.status(400).send({
           error_message:
             'Missing required fields: name, description, price, location, start_date, end_date are required',
@@ -181,13 +152,18 @@ export default class ServicesController {
         location,
         status: 'pending', // Nouveaux services sont toujours en attente de validation
         duration: duration || null,
-        availability_description: availability_description || null,
+
         home_service: home_service !== undefined ? home_service : true,
         requires_materials: requires_materials !== undefined ? requires_materials : false,
         isActive: false, // Inactif jusqu'à validation admin
       })
 
-      return response.created({ service: service.serialize() })
+      return response.created({
+        service: {
+          id: service.id,
+          ...service.serialize(),
+        },
+      })
     } catch (error) {
       console.error('Service creation error:', error)
 
@@ -226,7 +202,12 @@ export default class ServicesController {
 
       const service = await Service.findOrFail(serviceId)
 
-      return response.ok({ service: service.serialize() })
+      return response.ok({
+        service: {
+          id: service.id,
+          ...service.serialize(),
+        },
+      })
     } catch (error) {
       return response.status(404).send({ error_message: 'Service not found' })
     }
@@ -258,7 +239,7 @@ export default class ServicesController {
         prestataireId,
         location,
         status,
-        availability_description,
+
         home_service,
         requires_materials,
       } = request.body()
@@ -291,7 +272,7 @@ export default class ServicesController {
         location: location || service.location,
         duration: duration !== undefined ? duration : service.duration,
         status: status || service.status,
-        availability_description: availability_description || service.availability_description,
+
         home_service: home_service !== undefined ? home_service : service.home_service,
         requires_materials:
           requires_materials !== undefined ? requires_materials : service.requires_materials,
@@ -300,7 +281,12 @@ export default class ServicesController {
 
       await service.save()
 
-      return response.ok({ service: service.serialize() })
+      return response.ok({
+        service: {
+          id: service.id,
+          ...service.serialize(),
+        },
+      })
     } catch (error) {
       console.error('Service update error:', error)
 
@@ -386,8 +372,6 @@ export default class ServicesController {
         })
       }
 
-      // Pour cette démo, retourner tous les services actifs
-      // Dans un vrai projet, utiliser une requête spatiale
       const services = await Service.query()
         .where('is_active', true)
         .where('status', 'available')
@@ -395,7 +379,13 @@ export default class ServicesController {
         .orderBy('price', 'asc')
         .paginate(page, limit)
 
-      // Charger les utilisateurs séparément avec une seule requête
+      console.log('Backend services_controller.ts - Services query result:', services.all().map(s => ({
+        id: s.id,
+        prestataireId: s.prestataireId,
+        name: s.name,
+        serialized: s.serialize()
+      })));
+
       const prestataireIds = services.map((s) => s.prestataire?.id).filter(Boolean) as number[]
       const users = await Utilisateurs.query().whereIn('id', prestataireIds)
       const usersMap = new Map(users.map((u) => [u.id, u]))
@@ -427,11 +417,6 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * @tag Services - Géolocalisation
-   * @summary Carte interactive des prestataires
-   * @description Données cartographiques pour affichage des prestataires sur carte
-   */
   async getServiceProvidersMap({ request, response }: HttpContext) {
     try {
       const { lat, lng, radius } = request.qs()
@@ -439,7 +424,6 @@ export default class ServicesController {
       const longitude = lng ? Number.parseFloat(lng) : null
       const radiusKm = radius ? Number.parseFloat(radius) : 10
 
-      // Validation des paramètres optionnels
       if (latitude !== null && (Number.isNaN(latitude) || latitude < -90 || latitude > 90)) {
         return response.status(400).send({
           error_message: 'Invalid latitude (must be between -90 and 90)',
@@ -752,104 +736,6 @@ export default class ServicesController {
         error: error.message,
       })
     }
-  }
-
-  /**
-   * Calendrier des disponibilités des prestataires
-   */
-  async getProviderCalendar({ request, response }: HttpContext) {
-    try {
-      const prestataireId = request.param('prestataireId') || request.qs().prestataireId
-      const month = request.qs().month || DateTime.now().month
-      const year = request.qs().year || DateTime.now().year
-
-      if (!prestataireId) {
-        return response.status(400).send({
-          error_message: 'prestataireId is required',
-        })
-      }
-
-      const prestataire = await Prestataire.findOrFail(prestataireId)
-      const prestataireUser = await Utilisateurs.findOrFail(prestataireId)
-
-      const startOfMonth = DateTime.fromObject({
-        year: Number.parseInt(year.toString()),
-        month: Number.parseInt(month.toString()),
-        day: 1,
-      })
-      const endOfMonth = startOfMonth.endOf('month')
-
-      const services = await Service.query()
-        .where('prestataireId', prestataireId)
-        .whereBetween('start_date', [startOfMonth.toSQL()!, endOfMonth.toSQL()!])
-        .orderBy('start_date', 'asc')
-
-      const calendarData = {
-        prestataire: {
-          id: prestataire.id,
-          name: `${prestataireUser.first_name} ${prestataireUser.last_name}`,
-          service_type: prestataire.service_type,
-          rating: prestataire.rating,
-        },
-        month: Number.parseInt(month.toString()),
-        year: Number.parseInt(year.toString()),
-        services: services.map((service) => ({
-          id: service.id,
-          name: service.name,
-          start_date: service.start_date?.toISODate(),
-          end_date: service.end_date?.toISODate(),
-          start_time: service.start_date?.toFormat('HH:mm'),
-          end_time: service.end_date?.toFormat('HH:mm'),
-          status: service.status,
-          price: service.price,
-          duration: service.duration,
-        })),
-        available_slots: this.generateAvailableSlots(services, startOfMonth, endOfMonth),
-      }
-
-      return response.ok(calendarData)
-    } catch (error) {
-      console.error('Provider calendar error:', error)
-      return response.status(500).send({
-        error_message: 'Failed to fetch provider calendar',
-        error: error.message,
-      })
-    }
-  }
-
-  /**
-   * Génération de créneaux disponibles (helper)
-   */
-  private generateAvailableSlots(
-    services: Service[],
-    startOfMonth: DateTime,
-    endOfMonth: DateTime
-  ) {
-    const availableSlots = []
-    const workingHours = { start: 8, end: 18 }
-
-    let currentDate = startOfMonth
-    while (currentDate <= endOfMonth) {
-      if (currentDate.weekday !== 7) {
-        const dayServices = services.filter((service) =>
-          service.start_date?.hasSame(currentDate, 'day')
-        )
-
-        if (dayServices.length < 3) {
-          availableSlots.push({
-            date: currentDate.toISODate(),
-            slots: [
-              { start: '09:00', end: '11:00', available: dayServices.length === 0 },
-              { start: '14:00', end: '16:00', available: dayServices.length <= 1 },
-              { start: '16:30', end: '18:00', available: dayServices.length <= 2 },
-            ],
-          })
-        }
-      }
-      currentDate = currentDate.plus({ days: 1 })
-    }
-
-    return availableSlots
   }
 
   // ===============================================

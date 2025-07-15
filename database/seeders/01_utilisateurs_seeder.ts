@@ -1,5 +1,6 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import Utilisateurs from '#models/utilisateurs'
+import Client from '#models/client'
 // Le hachage sera appliqué automatiquement par le hook @beforeSave du modèle Utilisateurs
 
 export default class extends BaseSeeder {
@@ -260,17 +261,27 @@ export default class extends BaseSeeder {
     ]
 
     // ✅ CRÉER LES UTILISATEURS AVEC GESTION D'ERREURS
-    for (const userData of users) {
-      try {
-        await Utilisateurs.create(userData)
-        console.log(
-          `✅ Utilisateur créé: ${userData.first_name} ${userData.last_name} (${userData.email})`
-        )
-      } catch (error) {
-        console.log(`❌ Erreur création ${userData.email}:`, error.message)
+    await Utilisateurs.createMany(users)
+    console.log(`✅ ${users.length} utilisateurs créés`)
+
+    // =================================================================
+    // CRÉATION AUTOMATIQUE DES PROFILS CLIENTS
+    // =================================================================
+    const allUsers = await Utilisateurs.all()
+    let clientsCreated = 0
+    for (const user of allUsers) {
+      // Vérifier si un client n'existe pas déjà pour cet utilisateur
+      const existingClient = await Client.find(user.id)
+      if (!existingClient) {
+        await Client.create({
+          id: user.id,
+          loyalty_points: Math.floor(Math.random() * 300),
+          preferred_payment_method: 'carte_bancaire',
+        })
+        clientsCreated++
       }
     }
 
-    console.log(`✅ ${users.length} utilisateurs EcoDeli créés avec mots de passe hashés`)
+    console.log(`✅ ${clientsCreated} profils clients créés automatiquement`)
   }
 }

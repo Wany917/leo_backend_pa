@@ -65,6 +65,8 @@
     "@vinejs/vine": "^3.0.0",
     "adonis-autoswagger": "^3.73.0",
     "aws-sdk": "^2.1692.0",
+    "geoip": "^0.6.1",
+    "geoip-lite": "^1.4.10",
     "luxon": "^3.5.0",
     "pdfkit": "^0.17.1",
     "reflect-metadata": "^0.2.2",

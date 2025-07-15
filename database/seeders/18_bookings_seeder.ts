@@ -23,7 +23,8 @@ export default class extends BaseSeeder {
       {
         client_id: clients[0]?.id,
         service_id: services[0]?.id,
-        booking_date: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+        start_datetime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+        end_datetime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'pending',
         notes: 'Réservation en attente de validation',
         created_at: now,
@@ -33,7 +34,8 @@ export default class extends BaseSeeder {
       {
         client_id: clients[1]?.id,
         service_id: services[1]?.id,
-        booking_date: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
+        start_datetime: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
+        end_datetime: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'confirmed',
         notes: 'Prestataire confirmé',
         created_at: now,
@@ -43,7 +45,8 @@ export default class extends BaseSeeder {
       {
         client_id: clients[2]?.id,
         service_id: services[2]?.id,
-        booking_date: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+        start_datetime: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+        end_datetime: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'completed',
         notes: 'Prestation terminée avec succès',
         created_at: now,
@@ -53,7 +56,8 @@ export default class extends BaseSeeder {
       {
         client_id: clients[3]?.id,
         service_id: services[3]?.id,
-        booking_date: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+        start_datetime: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+        end_datetime: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'cancelled',
         notes: 'Client a annulé la réservation',
         created_at: now,

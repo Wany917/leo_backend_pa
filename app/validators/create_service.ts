@@ -23,7 +23,7 @@ export const serviceValidator = vine.compile(
         'refused',
       ])
       .optional(),
-    availability_description: vine.string().maxLength(500).nullable().optional(),
+
     home_service: vine.boolean().optional(),
     requires_materials: vine.boolean().optional(),
     prestataireId: vine.number().positive().optional(),

@@ -105,7 +105,7 @@ export default class PrestatairesController {
       const updateData = request.only([
         'service_type',
         'rating',
-        'availability',
+
         'description',
         'experience_years',
         'certifications',

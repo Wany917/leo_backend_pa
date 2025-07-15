@@ -34,9 +34,6 @@ export default class Service extends BaseModel {
   declare status: string
 
   @column()
-  declare availability_description: string | null
-
-  @column()
   declare home_service: boolean
 
   @column()
