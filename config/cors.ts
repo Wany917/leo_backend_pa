@@ -9,11 +9,11 @@ import { defineConfig } from '@adonisjs/cors'
 const corsConfig = defineConfig({
   enabled: true,
   origin: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   headers: true,
   exposeHeaders: [],
   credentials: true,
-  maxAge: 90,
+  maxAge: 86400,
 })
 
 export default corsConfig

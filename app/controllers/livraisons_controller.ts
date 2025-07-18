@@ -135,8 +135,6 @@ export default class LivraisonsController {
   async getClientLivraisons({ params, response }: HttpContext) {
     try {
       const clientId = params.client_id
-      console.log('🔍 getClientLivraisons called with clientId:', clientId)
-      console.log('🔍 clientId type:', typeof clientId)
 
       const livraisons = await Livraison.query()
         .where('client_id', clientId)
@@ -147,37 +145,15 @@ export default class LivraisonsController {
         })
         .orderBy('created_at', 'desc')
 
-      console.log('🔍 Query result count:', livraisons.length)
-      console.log(
-        '🔍 Found livraisons:',
-        livraisons.map((l) => ({
-          id: l.id,
-          clientId: l.clientId,
-          client_id: l.clientId,
-          status: l.status,
-        }))
-      )
-
       // Vérifier s'il y a des livraisons en base avec d'autres client_id
       const allLivraisons = await Livraison.query()
         .select('id', 'client_id')
         .orderBy('id', 'desc')
         .limit(10)
-      console.log(
-        '🔍 All recent livraisons in DB (sample):',
-        allLivraisons.map((l) => ({ id: l.id, client_id: l.clientId }))
-      )
 
       // 🚀 ENRICHIR LES LIVRAISONS AVEC LES DONNÉES DE PAIEMENT
       const enrichedLivraisons = livraisons.map((livraison) => {
         const serialized = livraison.serialize()
-
-        console.log(' Processing livraison payment data:', {
-          id: livraison.id,
-          paymentStatus: livraison.paymentStatus,
-          paymentIntentId: livraison.paymentIntentId,
-          amount: livraison.amount,
-        })
 
         // Utiliser les champs de paiement du modèle
         return {
@@ -187,8 +163,6 @@ export default class LivraisonsController {
           amount: livraison.amount || null,
         }
       })
-
-      console.log('✅ Enriched livraisons count:', enrichedLivraisons.length)
 
       return response.ok({
         success: true,

@@ -25,8 +25,7 @@ export default class Complaint extends BaseModel {
   @column()
   declare relatedOrderId: string | null
 
-  @column()
-  declare imagePath: string | null
+  // Image path removed
 
   @column()
   declare adminNotes: string | null

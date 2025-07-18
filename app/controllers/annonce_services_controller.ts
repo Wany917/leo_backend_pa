@@ -3,9 +3,7 @@ import Annonce from '#models/annonce'
 import Service from '#models/service'
 
 export default class AnnonceServicesController {
-  /**
-   * Attribuer des services à une annonce
-   */
+
   async attachServices({ request, response }: HttpContext) {
     try {
       const annonceId = request.param('id')
@@ -13,10 +11,10 @@ export default class AnnonceServicesController {
 
       const annonce = await Annonce.findOrFail(annonceId)
 
-      // Ajouter les services à l'annonce
+
       await annonce.related('services').attach(service_ids)
 
-      // Recharger l'annonce avec ses services
+
       await annonce.load('services')
 
       return response.ok({ annonce: annonce.serialize() })
@@ -25,9 +23,7 @@ export default class AnnonceServicesController {
     }
   }
 
-  /**
-   * Retirer des services d'une annonce
-   */
+
   async detachServices({ request, response }: HttpContext) {
     try {
       const annonceId = request.param('id')
@@ -35,10 +31,10 @@ export default class AnnonceServicesController {
 
       const annonce = await Annonce.findOrFail(annonceId)
 
-      // Retirer les services de l'annonce
+
       await annonce.related('services').detach(service_ids)
 
-      // Recharger l'annonce avec ses services
+
       await annonce.load('services')
 
       return response.ok({ annonce: annonce.serialize() })
@@ -47,9 +43,7 @@ export default class AnnonceServicesController {
     }
   }
 
-  /**
-   * Récupérer tous les services d'une annonce
-   */
+
   async getServices({ request, response }: HttpContext) {
     try {
       const annonceId = request.param('id')

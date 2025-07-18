@@ -26,6 +26,9 @@ export default class Booking extends BaseModel {
   @column()
   declare notes: string | null
 
+  @column()
+  declare address: string
+
   @column({ columnName: 'total_price' })
   declare totalPrice: number | null
 

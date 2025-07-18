@@ -507,12 +507,14 @@ router
     // Routes publiques/CRUD basiques
     router.get('/', [BookingsController, 'index']).use(middleware.auth())
     router.post('/', [BookingsController, 'create']).use(middleware.auth())
-    
+
     // Route spécifique pour les bookings utilisateur (doit être avant :id)
     router.get('user', [BookingsController, 'getUserBookings']).use(middleware.auth())
-    
+
     router.get(':id', [BookingsController, 'show']).use(middleware.auth())
     router.put(':id/status', [BookingsController, 'updateStatus']).use(middleware.auth())
+    router.put(':id/cancel', [BookingsController, 'cancel']).use(middleware.auth())
+    router.patch(':id/cancel', [BookingsController, 'cancel']).use(middleware.auth())
 
     // Routes par client
     router.get('client/:clientId', [BookingsController, 'getClientBookings']).use(middleware.auth())

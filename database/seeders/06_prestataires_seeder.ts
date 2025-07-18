@@ -3,8 +3,6 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // Pas de retour anticipé : on veut mettre à jour ou insérer au besoin
-    // (on garde l'information uniquement pour log éventuel)
     const existingPrestataires = await this.client.from('prestataires').count('* as total')
     if (Number(existingPrestataires[0].total) > 0) {
       console.log(
@@ -12,7 +10,6 @@ export default class extends BaseSeeder {
       )
     }
 
-    // ✅ RÉCUPÉRER LES UTILISATEURS EXISTANTS
     const isabelle = await Utilisateurs.findBy('email', 'isabelle.cohen@prestafake.fr')
     const thomas = await Utilisateurs.findBy('email', 'thomas.roux@servicefake.com')
     const sandra = await Utilisateurs.findBy('email', 'sandra.petit@pretafake.org')

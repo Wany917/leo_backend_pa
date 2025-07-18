@@ -10,11 +10,7 @@ import { DateTime } from 'luxon'
 import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class RatingsController {
-  /**
-   * @tag Ratings - Public
-   * @summary Lister tous les ratings (public)
-   * @description Récupère tous les ratings avec les relations nécessaires pour les utilisateurs authentifiés.
-   */
+
   async getAllRatings({ response }: HttpContext) {
     try {
       const ratings = await Rating.query()
@@ -33,9 +29,8 @@ export default class RatingsController {
             if (delivery) itemName = `Livraison #${delivery.id}`
           }
 
-          console.log("Reviewed : ", rating.reviewed.first_name)
 
-          // Ajouter le nom et prénom de l'utilisateur reviewed
+
           const reviewedUserName = rating.reviewed 
             ? `${rating.reviewed.first_name} ${rating.reviewed.last_name}`
             : 'Utilisateur inconnu'
@@ -50,7 +45,6 @@ export default class RatingsController {
 
       return response.ok(ratingsWithDetails)
     } catch (error) {
-      console.error('Error fetching ratings:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch ratings',
         error: error.message,
@@ -58,16 +52,12 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Admin
-   * @summary Lister tous les ratings pour l'admin
-   * @description Récupère tous les ratings avec les relations nécessaires.
-   */
+
   async index({ response }: HttpContext) {
     try {
       const ratings = await Rating.query()
-        .preload('reviewer') // Charge l'utilisateur qui a laissé l'avis
-        .preload('reviewed') // Charge l'utilisateur qui a été noté
+        .preload('reviewer')
+        .preload('reviewed')
         .orderBy('created_at', 'desc')
 
       const ratingsWithDetails = await Promise.all(
@@ -81,7 +71,7 @@ export default class RatingsController {
             if (delivery) itemName = `Livraison #${delivery.id}`
           }
 
-          // Ajouter le nom et prénom de l'utilisateur reviewed
+
           const reviewedUserName = rating.reviewed 
             ? `${rating.reviewed.first_name} ${rating.reviewed.last_name}`
             : 'Utilisateur inconnu'
@@ -96,7 +86,6 @@ export default class RatingsController {
 
       return response.ok(ratingsWithDetails)
     } catch (error) {
-      console.error('Error fetching ratings for admin:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch ratings',
         error: error.message,
@@ -104,17 +93,13 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - CRUD
-   * @summary Créer une nouvelle évaluation
-   * @description Permet à un client d'évaluer un livreur ou prestataire
-   */
+
   async create({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
       const data = await request.validateUsing(createRatingValidator)
 
-      // Vérifier que l'utilisateur peut évaluer
+
       const canRate = await this.canUserRate(user.id, data.rating_type, data.rating_for_id)
       if (!canRate.allowed) {
         return response.forbidden({
@@ -123,7 +108,7 @@ export default class RatingsController {
         })
       }
 
-      // Vérifier qu'une évaluation n'existe pas déjà
+
       const existingRating = await Rating.query()
         .where('reviewer_id', user.id)
         .where('rating_type', data.rating_type)
@@ -137,7 +122,7 @@ export default class RatingsController {
         })
       }
 
-      // Créer l'évaluation
+
       const rating = await Rating.create({
         reviewerId: user.id,
         reviewedId: data.reviewed_id,
@@ -147,7 +132,7 @@ export default class RatingsController {
         comment: data.comment,
       })
 
-      // Mettre à jour le rating moyen du livreur/prestataire
+
       await this.updateAverageRating(data.reviewed_id, data.rating_type)
 
       return response.created({
@@ -156,7 +141,6 @@ export default class RatingsController {
         rating: rating.serialize(),
       })
     } catch (error) {
-      console.error('❌ Erreur création rating:', error)
       return response.internalServerError({
         success: false,
         message: "Erreur lors de la création de l'évaluation",
@@ -165,11 +149,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Lecture
-   * @summary Récupérer les évaluations d'un utilisateur
-   * @description Récupère toutes les évaluations reçues par un livreur/prestataire
-   */
+
   async getByUser({ request, response }: HttpContext) {
     try {
       const userId = request.param('userId')
@@ -191,7 +171,7 @@ export default class RatingsController {
 
       const ratings = await query.paginate(page, limit)
 
-      // Calculer les statistiques
+
       const stats = await this.getRatingStats(userId, ratingType)
 
       return response.ok({
@@ -200,7 +180,6 @@ export default class RatingsController {
         stats,
       })
     } catch (error) {
-      console.error('❌ Erreur récupération ratings:', error)
       return response.internalServerError({
         success: false,
         message: 'Erreur lors de la récupération des évaluations',
@@ -208,11 +187,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Lecture
-   * @summary Récupérer les évaluations d'une livraison/service
-   * @description Récupère les évaluations pour une livraison ou service spécifique
-   */
+
   async getByItem({ request, response }: HttpContext) {
     try {
       const itemId = request.param('itemId')
@@ -234,11 +209,10 @@ export default class RatingsController {
         success: true,
         ratings: ratings.map((rating) => ({
           ...rating.serialize(),
-          reviewer_id: rating.reviewerId, // 🌟 AJOUT: ID du reviewer pour identifier les ratings de l'utilisateur
+          reviewer_id: rating.reviewerId,
         })),
       })
     } catch (error) {
-      console.error('❌ Erreur récupération ratings item:', error)
       return response.internalServerError({
         success: false,
         message: 'Erreur lors de la récupération des évaluations',
@@ -246,11 +220,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Statistiques
-   * @summary Statistiques détaillées des évaluations
-   * @description Récupère les statistiques complètes d'un livreur/prestataire
-   */
+
   async getStats({ request, response }: HttpContext) {
     try {
       const userId = request.param('userId')
@@ -263,7 +233,6 @@ export default class RatingsController {
         stats,
       })
     } catch (error) {
-      console.error('❌ Erreur stats ratings:', error)
       return response.internalServerError({
         success: false,
         message: 'Erreur lors de la récupération des statistiques',
@@ -271,10 +240,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Consultation
-   * @summary Vérifier si l'utilisateur connecté a déjà évalué un élément spécifique
-   */
+
   async checkUserRating({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
@@ -306,7 +272,6 @@ export default class RatingsController {
           : null,
       })
     } catch (error) {
-      console.error('❌ Erreur vérification rating utilisateur:', error)
       return response.internalServerError({
         success: false,
         message: 'Erreur lors de la vérification',
@@ -314,11 +279,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Admin
-   * @summary Répondre à une évaluation (Admin)
-   * @description Permet aux admins de répondre à une évaluation
-   */
+
   async adminResponse({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
@@ -327,7 +288,7 @@ export default class RatingsController {
         adminRatingResponseValidator
       )
 
-      // Vérifier que l'utilisateur est admin
+
       const isAdmin = await user.related('admin').query().first()
       if (!isAdmin) {
         return response.forbidden({
@@ -348,7 +309,6 @@ export default class RatingsController {
         rating: rating.serialize(),
       })
     } catch (error) {
-      console.error('❌ Erreur réponse admin:', error)
       return response.internalServerError({
         success: false,
         message: "Erreur lors de l'ajout de la réponse",
@@ -356,10 +316,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Admin
-   * @summary Ajoute une réponse admin à un avis
-   */
+
   async addAdminResponse({ request, response }: HttpContext) {
     try {
       const rating = await Rating.findOrFail(request.param('id'))
@@ -375,10 +332,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * @tag Ratings - Admin
-   * @summary Bascule la visibilité d'un avis
-   */
+
   async toggleVisibility({ request, response }: HttpContext) {
     try {
       const rating = await Rating.findOrFail(request.param('id'))
@@ -391,13 +345,9 @@ export default class RatingsController {
     }
   }
 
-  // =============================================================================
-  // MÉTHODES PRIVÉES
-  // =============================================================================
 
-  /**
-   * Vérifier si un utilisateur peut évaluer un élément
-   */
+
+
   private async canUserRate(
     userId: number,
     ratingType: string,
@@ -408,11 +358,10 @@ export default class RatingsController {
   }> {
     try {
       if (ratingType === 'delivery') {
-        // Vérifier que l'utilisateur est le client de la livraison
         const livraison = await Livraison.query()
           .where('id', ratingForId)
           .where('client_id', userId)
-          .where('status', 'completed') // Seules les livraisons terminées peuvent être évaluées
+          .where('status', 'completed')
           .first()
 
         if (!livraison) {
@@ -426,7 +375,6 @@ export default class RatingsController {
       }
 
       if (ratingType === 'service') {
-        // Vérifier que l'utilisateur a réservé ce service
         const service = await Service.query()
           .where('id', ratingForId)
           .where('client_id', userId)
@@ -448,7 +396,6 @@ export default class RatingsController {
         reason: "Type d'évaluation non supporté",
       }
     } catch (error) {
-      console.error('Erreur vérification droit évaluation:', error)
       return {
         allowed: false,
         reason: 'Erreur lors de la vérification des droits',
@@ -456,9 +403,7 @@ export default class RatingsController {
     }
   }
 
-  /**
-   * Mettre à jour le rating moyen d'un utilisateur
-   */
+
   private async updateAverageRating(userId: number, ratingType: string): Promise<void> {
     try {
       const avgRating = await Rating.query()
@@ -478,13 +423,10 @@ export default class RatingsController {
         }
       }
     } catch (error) {
-      console.error('Erreur mise à jour rating moyen:', error)
     }
   }
 
-  /**
-   * Récupérer les statistiques détaillées des ratings
-   */
+
   private async getRatingStats(userId: number, ratingType?: string): Promise<any> {
     try {
       let query = Rating.query().where('reviewed_id', userId).where('is_visible', true)
@@ -519,7 +461,6 @@ export default class RatingsController {
         })),
       }
     } catch (error) {
-      console.error('Erreur calcul stats:', error)
       return {
         total_ratings: 0,
         averages: {

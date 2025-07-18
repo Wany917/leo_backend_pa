@@ -49,7 +49,7 @@ export default class WharehousesController {
   async delete({ request, response }: HttpContext) {
     const wharehouse = await Wharehouse.findOrFail(request.param('id'))
 
-    // Vérifier s'il y a des colis stockés
+
     const storedColis = await StockageColi.query()
       .where('wharehouse_id', wharehouse.id)
       .count('* as total')
@@ -70,7 +70,7 @@ export default class WharehousesController {
   async getAvailableCapacity({ request, response }: HttpContext) {
     const wharehouse = await Wharehouse.findOrFail(request.param('id'))
 
-    // Calculer la capacité utilisée
+
     const storedColis = await StockageColi.query()
       .where('wharehouse_id', wharehouse.id)
       .count('* as total')

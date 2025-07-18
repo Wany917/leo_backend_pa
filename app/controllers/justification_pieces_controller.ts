@@ -10,12 +10,10 @@ import fs from 'node:fs/promises'
 import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class JustificationPiecesController {
-  /**
-   * Create justification piece with file upload
-   */
+
   async create({ request, response }: HttpContext) {
     try {
-      // Handle file upload
+
       const file = request.file('file', {
         size: '10mb',
         extnames: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
@@ -28,7 +26,7 @@ export default class JustificationPiecesController {
         })
       }
 
-      // Get form data
+
       const utilisateur_id = request.input('utilisateur_id')
       const document_type = request.input('document_type')
       const account_type = request.input('account_type')
@@ -74,7 +72,6 @@ export default class JustificationPiecesController {
         data: justificationPiece.serialize(),
       })
     } catch (error) {
-      console.error('Error creating justification piece:', error)
       return response.badRequest({
         status: 'error',
         message: 'Error creating justification piece',
@@ -99,7 +96,6 @@ export default class JustificationPiecesController {
 
       return response.download(filePath)
     } catch (error) {
-      console.error('Error downloading file:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
@@ -246,13 +242,11 @@ export default class JustificationPiecesController {
   async verify({ request, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
-      // const { comments } = request.only(['comments'])
 
-      // 🎯 AMÉLIORATION: Vérifier si l'utilisateur a déjà le rôle
       const userId = justificationPiece.utilisateur_id
       const accountType = justificationPiece.account_type
 
-      console.log(`🎯 Processing verification for user ${userId} with account type: ${accountType}`)
+
 
       let roleAlreadyExists = false
       try {
@@ -271,27 +265,18 @@ export default class JustificationPiecesController {
             break
         }
       } catch (roleCheckError) {
-        console.error(`❌ Error checking existing role:`, roleCheckError)
       }
 
-      console.log(`🔍 Role already exists for user ${userId}: ${roleAlreadyExists}`)
-
-      // Si le rôle existe déjà, auto-valider TOUS les documents en attente pour ce type de compte
       if (roleAlreadyExists) {
-        console.log(`🚀 Auto-validating all pending documents for user ${userId} (${accountType})`)
-
         const pendingDocuments = await JustificationPiece.query()
           .where('utilisateur_id', userId)
           .where('account_type', accountType)
           .where('verification_status', 'pending')
 
-        console.log(`📋 Found ${pendingDocuments.length} pending documents to auto-validate`)
-
         for (const doc of pendingDocuments) {
           doc.verification_status = 'verified'
           doc.verified_at = DateTime.now()
           await doc.save()
-          console.log(`✅ Auto-validated document ${doc.id} (${doc.document_type})`)
         }
 
         return response.ok({
@@ -304,12 +289,12 @@ export default class JustificationPiecesController {
         })
       }
 
-      // Logique normale si le rôle n'existe pas encore
+
       justificationPiece.verification_status = 'verified'
       justificationPiece.verified_at = DateTime.now()
       await justificationPiece.save()
 
-      console.log(`🎯 Creating new role for user ${userId} with account type: ${accountType}`)
+
 
       try {
         switch (accountType) {
@@ -319,7 +304,7 @@ export default class JustificationPiecesController {
               availabilityStatus: 'available',
               rating: null,
             })
-            console.log(`✅ Livreur role created for user ${userId}`)
+
             break
 
           case 'prestataire':
@@ -328,7 +313,7 @@ export default class JustificationPiecesController {
               service_type: null,
               rating: null,
             })
-            console.log(`✅ Prestataire role created for user ${userId}`)
+
             break
 
           case 'commercant':
@@ -341,14 +326,12 @@ export default class JustificationPiecesController {
               contractEndDate: DateTime.now().plus({ years: 1 }),
               verificationState: 'verified',
             })
-            console.log(`✅ Commercant role created for user ${userId}`)
+
             break
 
           default:
-            console.log(`⚠️ Unknown account type: ${accountType}`)
         }
       } catch (roleError) {
-        console.error(`❌ Error creating role for user ${userId}:`, roleError)
       }
 
       return response.ok({
@@ -357,7 +340,6 @@ export default class JustificationPiecesController {
         data: justificationPiece.serialize(),
       })
     } catch (error) {
-      console.error('Error verifying justification piece:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
@@ -373,10 +355,7 @@ export default class JustificationPiecesController {
 
       justificationPiece.verification_status = 'rejected'
 
-      // Ajouter les commentaires si fournis
       if (comments) {
-        // Pour l'instant, nous allons utiliser un champ existant ou en créer un nouveau
-        // justificationPiece.review_comments = comments
       }
 
       await justificationPiece.save()
@@ -387,7 +366,6 @@ export default class JustificationPiecesController {
         data: justificationPiece.serialize(),
       })
     } catch (error) {
-      console.error('Error rejecting justification piece:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
@@ -396,22 +374,17 @@ export default class JustificationPiecesController {
     }
   }
 
-  /**
-   * Delete justification piece and associated file
-   */
+
   async delete({ params, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
 
-      // Delete file from disk
+
       try {
         await fs.unlink(filePath)
       } catch (error) {
-        console.warn('File not found on disk, continuing with database deletion:', error.message)
       }
-
-      // Delete database record
       await justificationPiece.delete()
 
       return response.ok({
@@ -419,7 +392,6 @@ export default class JustificationPiecesController {
         message: 'Justification piece deleted successfully',
       })
     } catch (error) {
-      console.error('Error deleting justification piece:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
@@ -428,15 +400,13 @@ export default class JustificationPiecesController {
     }
   }
 
-  /**
-   * Download file by justification piece ID
-   */
+
   async downloadById({ params, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
 
-      // Check if file exists
+
       try {
         await fs.access(filePath)
       } catch {
@@ -448,7 +418,6 @@ export default class JustificationPiecesController {
 
       return response.download(filePath)
     } catch (error) {
-      console.error('Error downloading justification file by ID:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',

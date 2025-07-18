@@ -3,11 +3,6 @@ import Complaint from '#models/complaint'
 import db from '@adonisjs/lucid/services/db'
 
 export default class ComplaintsController {
-  /**
-   * @tag Réclamations - Gestion
-   * @summary Lister toutes les réclamations
-   * @description Récupère toutes les réclamations avec informations utilisateur
-   */
   async index({ response }: HttpContext) {
     const complaints = await Complaint.query()
       .preload('utilisateur' as any)
@@ -16,14 +11,8 @@ export default class ComplaintsController {
     return response.ok({ complaints: complaints.map((complaint) => complaint.serialize()) })
   }
 
-  /**
-   * @tag Réclamations - Gestion
-   * @summary Créer une nouvelle réclamation
-   * @description Permet aux utilisateurs de créer une réclamation avec upload d'image
-   */
   async create({ request, response }: HttpContext) {
     try {
-      // Récupérer le dernier ID de la table complaints
       const result = await db.from('complaints').max('id as maxId').first()
       const maxId = result?.maxId || 0
       const nextId = Number(maxId) + 1
@@ -37,7 +26,7 @@ export default class ComplaintsController {
       } = request.body()
 
       const complaint = await Complaint.create({
-        id: nextId, // Définir explicitement le prochain ID
+        id: nextId,
         utilisateurId,
         subject,
         description,
@@ -50,7 +39,6 @@ export default class ComplaintsController {
       await complaint.load('utilisateur' as any)
       return response.created({ complaint: complaint.serialize() })
     } catch (error) {
-      console.error('Error creating complaint:', error)
       return response.status(500).send({
         error: error.message,
         detail: error.detail || 'Une erreur inconnue est survenue',
@@ -58,11 +46,6 @@ export default class ComplaintsController {
     }
   }
 
-  /**
-   * @tag Réclamations - Gestion
-   * @summary Récupérer une réclamation par ID
-   * @description Affiche les détails d'une réclamation spécifique
-   */
   async show({ request, response }: HttpContext) {
     const complaint = await Complaint.query()
       .where('id', request.param('id'))
@@ -72,11 +55,6 @@ export default class ComplaintsController {
     return response.ok({ complaint: complaint.serialize() })
   }
 
-  /**
-   * @tag Réclamations - Gestion
-   * @summary Mettre à jour une réclamation
-   * @description Modifie une réclamation existante (admin ou utilisateur propriétaire)
-   */
   async update({ request, response }: HttpContext) {
     const complaint = await Complaint.findOrFail(request.param('id'))
 

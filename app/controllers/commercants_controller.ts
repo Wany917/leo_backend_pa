@@ -6,31 +6,25 @@ import { DateTime } from 'luxon'
 
 export default class CommercantsController {
   async add({ request, response }: HttpContext) {
-    console.log('🟡 ENTRÉE CONTROLLER COMMERCANT')
-    console.log('🟡 REQUEST BODY:', request.body())
-    console.log('🟡 REQUEST HEADERS:', request.headers())
+
 
     try {
-      console.log('🟡 AVANT VALIDATION...')
+
       const {
         utilisateur_id,
         store_name,
         business_address,
       } = await request.validateUsing(commercantValidator)
 
-      console.log('🟡 VALIDATION RÉUSSIE, données extraites:', {
-        utilisateur_id,
-        store_name,
-        business_address,
-      })
+
 
       const commercantAlreadyLinked = await Commercant.find(utilisateur_id)
       if (commercantAlreadyLinked) {
-        console.log('🟡 Commercant déjà existant')
+
         return response.badRequest({ message: 'Utilisateur already has a Commercant account' })
       }
 
-      console.log('🟡 CRÉATION DU COMMERCANT...')
+
       const commercant = await Commercant.create({
         id: utilisateur_id,
         storeName: store_name,
@@ -38,15 +32,13 @@ export default class CommercantsController {
         verificationState: 'pending',
       })
 
-      console.log('🟡 COMMERCANT CRÉÉ AVEC SUCCÈS:', commercant.serialize())
+
       return response.created({
         message: 'Commercant created successfully',
         commercant: commercant.serialize(),
       })
     } catch (error) {
-      console.error('🔴 ERREUR DANS CONTROLLER:', error)
-      console.error('🔴 ERREUR MESSAGE:', error.message)
-      console.error('🔴 ERREUR STACK:', error.stack)
+
       return response.badRequest({ message: 'Invalid data', error_code: error })
     }
   }

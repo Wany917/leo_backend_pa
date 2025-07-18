@@ -72,7 +72,6 @@ export default class FilesController {
         }
       })
     } catch (error) {
-      console.error('Error uploading justification file:', error)
       return response.internalServerError({
         status: 'error',
         message: 'Failed to upload file',
@@ -98,7 +97,7 @@ export default class FilesController {
       const justificationPiece = justificationPieces[0]
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
       
-      // Check if file exists
+
       try {
         await fs.access(filePath)
       } catch {
@@ -110,7 +109,6 @@ export default class FilesController {
 
       return response.download(filePath)
     } catch (error) {
-      console.error('Error downloading justification file:', error)
       return response.internalServerError({
         status: 'error',
         message: 'Internal server error while downloading file',
@@ -119,22 +117,19 @@ export default class FilesController {
     }
   }
 
-  /**
-   * Delete justification document
-   */
+
   public async deleteJustification({ params, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
       
-      // Delete file from disk
+
       try {
         await fs.unlink(filePath)
       } catch (error) {
-        console.warn('File not found on disk, continuing with database deletion:', error.message)
       }
 
-      // Delete database record
+
       await justificationPiece.delete()
 
       return response.ok({
@@ -142,7 +137,6 @@ export default class FilesController {
         message: 'Justification piece deleted successfully'
       })
     } catch (error) {
-      console.error('Error deleting justification file:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
@@ -151,9 +145,7 @@ export default class FilesController {
     }
   }
 
-  /**
-   * List all files in justifications directory
-   */
+
   public async listJustificationFiles({ response }: HttpContext) {
     try {
       const uploadsDir = app.makePath('tmp/uploads/justifications')
@@ -185,7 +177,6 @@ export default class FilesController {
         })
       }
     } catch (error) {
-      console.error('Error listing justification files:', error)
       return response.internalServerError({
         status: 'error',
         message: 'Failed to list files',
@@ -194,9 +185,7 @@ export default class FilesController {
     }
   }
 
-  /**
-   * Legacy upload method (keep for backward compatibility)
-   */
+
   public async upload({ request, response }: HttpContext) {
     const file = request.file('file', {
       size: '10mb',

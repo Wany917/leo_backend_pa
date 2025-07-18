@@ -48,8 +48,7 @@ export default class Annonce extends BaseModel {
   @column({ columnName: 'start_location' })
   declare startLocation: string | null
 
-  @column({ columnName: 'image_path' })
-  declare imagePath: string | null
+  // Image path property removed
 
   @column()
   declare priority: boolean

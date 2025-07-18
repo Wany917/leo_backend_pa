@@ -27,6 +27,7 @@ export default class extends BaseSeeder {
         end_datetime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'pending',
         notes: 'Réservation en attente de validation',
+        address: '123 Rue de la Paix, 75001 Paris',
         created_at: now,
         updated_at: now,
         total_price: 100.0,
@@ -38,6 +39,7 @@ export default class extends BaseSeeder {
         end_datetime: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'confirmed',
         notes: 'Prestataire confirmé',
+        address: '456 Avenue des Champs-Élysées, 75008 Paris',
         created_at: now,
         updated_at: now,
         total_price: 60.0,
@@ -49,6 +51,7 @@ export default class extends BaseSeeder {
         end_datetime: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'completed',
         notes: 'Prestation terminée avec succès',
+        address: '789 Boulevard Saint-Germain, 75006 Paris',
         created_at: now,
         updated_at: now,
         total_price: 60.0,
@@ -60,6 +63,7 @@ export default class extends BaseSeeder {
         end_datetime: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2h
         status: 'cancelled',
         notes: 'Client a annulé la réservation',
+        address: '321 Rue de Rivoli, 75004 Paris',
         created_at: now,
         updated_at: now,
         total_price: 60.0,

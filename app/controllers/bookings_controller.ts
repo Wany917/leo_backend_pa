@@ -4,13 +4,9 @@ import Service from '#models/service'
 import Utilisateurs from '#models/utilisateurs'
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
+import { createBookingValidator } from '#validators/create_booking'
 
 export default class BookingsController {
-  /**
-   * @tag Bookings - CRUD
-   * @summary Lister tous les bookings
-   * @description Récupère tous les bookings avec clients et services
-   */
   async index({ request, response }: HttpContext) {
     try {
       const page = request.input('page', 1)
@@ -31,7 +27,6 @@ export default class BookingsController {
 
       return response.ok(bookings.toJSON())
     } catch (error) {
-      console.error('Error fetching bookings:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch bookings',
         error: error.message,
@@ -39,31 +34,19 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - CRUD
-   * @summary Créer un nouveau booking
-   * @description Crée un booking pour un client avec un service
-   */
-  async create({ request, response }: HttpContext) {
+  async create({ request, response, auth }: HttpContext) {
     try {
-      const { client_id, service_id, start_datetime, end_datetime, notes } = request.body()
+      const payload = await request.validateUsing(createBookingValidator)
+      const { service_id, start_datetime, end_datetime, address, notes } = payload
 
-      // Validation des données
-      if (!client_id || !service_id || !start_datetime || !end_datetime) {
-        return response.status(400).send({
-          error_message: 'client_id, service_id, start_datetime et end_datetime sont requis',
-        })
-      }
-
-      // Vérifier que le client existe
-      const client = await Utilisateurs.find(client_id)
+      // Récupération automatique du client depuis l'authentification
+      const client = auth.user
       if (!client) {
-        return response.status(404).send({
-          error_message: 'Client non trouvé',
+        return response.status(401).send({
+          error_message: 'Utilisateur non authentifié',
         })
       }
 
-      // Vérifier que le service existe et est actif
       const service = await Service.find(service_id)
       if (!service) {
         return response.status(404).send({
@@ -77,9 +60,8 @@ export default class BookingsController {
         })
       }
 
-      // Convertir les dates
-      const startDateTime = DateTime.fromISO(start_datetime)
-      const endDateTime = DateTime.fromISO(end_datetime)
+      const startDateTime = DateTime.fromISO(start_datetime.toString())
+      const endDateTime = DateTime.fromISO(end_datetime.toString())
 
       if (!startDateTime.isValid || !endDateTime.isValid) {
         return response.status(400).send({
@@ -87,59 +69,38 @@ export default class BookingsController {
         })
       }
 
-      // Vérifier que la date de fin est après la date de début
-      if (endDateTime <= startDateTime) {
-        return response.status(400).send({
-          error_message: 'La date de fin doit être après la date de début',
-        })
-      }
-
-      // Vérifier que la date de début n'est pas dans le passé
       if (startDateTime < DateTime.now()) {
         return response.status(400).send({
-          error_message: 'La date de début ne peut pas être dans le passé',
+          error_message: 'La date de réservation ne peut pas être dans le passé',
         })
       }
 
-      // Vérifier les conflits de réservation
-      const conflictingBooking = await Booking.query()
-        .where('service_id', service_id)
-        .where('status', '!=', 'cancelled')
-        .where((query) => {
-          query
-            .whereBetween('start_datetime', [startDateTime.toSQL(), endDateTime.toSQL()])
-            .orWhereBetween('end_datetime', [startDateTime.toSQL(), endDateTime.toSQL()])
-            .orWhere((subQuery) => {
-              subQuery
-                .where('start_datetime', '<=', startDateTime.toSQL())
-                .where('end_datetime', '>=', endDateTime.toSQL())
-            })
-        })
-        .first()
-
-      if (conflictingBooking) {
-        return response.status(409).send({
-          error_message: 'Ce créneau horaire est déjà réservé',
+      if (endDateTime <= startDateTime) {
+        return response.status(400).send({
+          error_message: 'La date de fin doit être postérieure à la date de début',
         })
       }
 
-      // Créer le booking
       const booking = await Booking.create({
-        clientId: client_id,
+        clientId: client.id,
         serviceId: service_id,
         startDatetime: startDateTime,
         endDatetime: endDateTime,
+        address: address || 'Adresse à définir',
         notes: notes || null,
         status: 'pending',
         totalPrice: service.price,
       })
 
       return response.created({
-        message: 'Booking créé avec succès',
+        message: 'Réservation créée avec succès',
         booking: {
           id: booking.id,
-          start_datetime: booking.startDatetime.toISO(),
+          service_name: service.name,
+          client_name: `${client.first_name} ${client.last_name}`,
+          booking_datetime: booking.startDatetime.toISO(),
           end_datetime: booking.endDatetime.toISO(),
+          address: booking.address,
           duration_hours: booking.getDurationInHours(),
           status: booking.status,
           notes: booking.notes,
@@ -147,19 +108,14 @@ export default class BookingsController {
         },
       })
     } catch (error) {
-      console.error('Error creating booking:', error)
       return response.status(500).send({
         error_message: 'Failed to create booking',
         error: error.message,
+        error_object: error,
       })
     }
   }
 
-  /**
-   * @tag Bookings - CRUD
-   * @summary Récupérer un booking par ID
-   * @description Affiche les détails d'un booking spécifique
-   */
   async show({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
@@ -171,8 +127,10 @@ export default class BookingsController {
           'utilisateurs.first_name as client_first_name',
           'utilisateurs.last_name as client_last_name',
           'utilisateurs.email as client_email',
+          'utilisateurs.phone as client_phone',
           'services.name as service_name',
-          'services.description as service_description'
+          'services.description as service_description',
+          'services.price as service_price'
         )
         .join('utilisateurs', 'bookings.client_id', 'utilisateurs.id')
         .join('services', 'bookings.service_id', 'services.id')
@@ -196,11 +154,6 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - CRUD
-   * @summary Mettre à jour le statut d'un booking
-   * @description Met à jour le statut d'un booking (confirmed, completed, cancelled)
-   */
   async updateStatus({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
@@ -221,7 +174,6 @@ export default class BookingsController {
 
       const booking = await Booking.findOrFail(id)
 
-      // Vérifier les transitions de statut autorisées
       const canUpdate = this.validateStatusTransition(booking.status, status)
       if (!canUpdate.allowed) {
         return response.status(400).send({
@@ -229,7 +181,6 @@ export default class BookingsController {
         })
       }
 
-      // Mettre à jour le booking
       booking.status = status
       if (notes) {
         booking.notes = notes
@@ -253,11 +204,6 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - Client
-   * @summary Récupérer les bookings d'un client
-   * @description Liste tous les bookings d'un client spécifique
-   */
   async getClientBookings({ request, response }: HttpContext) {
     try {
       const clientId = request.param('clientId')
@@ -291,32 +237,55 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - Utilisateur
-   * @summary Récupérer les bookings de l'utilisateur connecté
-   * @description Liste tous les bookings de l'utilisateur connecté
-   */
   async getUserBookings({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!
       const status = request.input('status')
+
+      const client = await db.from('clients').where('id', user.id).first()
+      if (!client) {
+        return response.status(404).send({
+          error_message: 'Client non trouvé pour cet utilisateur',
+        })
+      }
 
       let query = db
         .from('bookings')
         .select(
           'bookings.*',
           'services.name as service_name',
-          'services.description as service_description'
+          'services.description as service_description',
+          'services.price'
         )
         .join('services', 'bookings.service_id', 'services.id')
-        .where('bookings.client_id', user.id)
+        .where('bookings.client_id', client.id)
         .orderBy('bookings.start_datetime', 'desc')
 
       if (status) {
         query = query.where('bookings.status', status)
       }
 
-      const bookings = await query
+      const rawBookings = await query
+
+      const bookings = rawBookings.map((booking) => ({
+        id: booking.id,
+        service_name: booking.service_name,
+        service_description: booking.service_description,
+        price: booking.price,
+        status: booking.status,
+        date: booking.start_datetime
+          ? new Date(booking.start_datetime).toISOString().split('T')[0]
+          : null,
+        time: booking.start_datetime
+          ? new Date(booking.start_datetime).toTimeString().slice(0, 5)
+          : null,
+        notes: booking.notes,
+        address: booking.address || 'Adresse non spécifiée',
+        start_datetime: booking.start_datetime,
+        end_datetime: booking.end_datetime,
+        created_at: booking.created_at,
+        updated_at: booking.updated_at,
+      }))
 
       return response.ok({
         bookings: bookings,
@@ -329,11 +298,6 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - Prestataire
-   * @summary Récupérer les bookings d'un prestataire
-   * @description Liste tous les bookings pour les services d'un prestataire
-   */
   async getProviderBookings({ request, response }: HttpContext) {
     try {
       const prestataireId = request.param('prestataireId')
@@ -363,11 +327,6 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - Analytics
-   * @summary Statistiques des bookings
-   * @description Récupère les statistiques globales des bookings
-   */
   async getBookingStats({ response }: HttpContext) {
     try {
       const totalBookings = await db.from('bookings').count('* as total').first()
@@ -392,11 +351,9 @@ export default class BookingsController {
         .count('* as total')
         .first()
 
-      // Revenus du mois en cours - Calculer à partir des prix des services
       const currentMonth = DateTime.now().startOf('month')
       const nextMonth = currentMonth.plus({ month: 1 })
 
-      // Utiliser un join avec la table services pour récupérer les prix
       const monthlyRevenue = await db
         .from('bookings')
         .join('services', 'bookings.service_id', 'services.id')
@@ -405,14 +362,12 @@ export default class BookingsController {
         .sum('services.price as revenue')
         .first()
 
-      // Calculer la moyenne des réservations par type de statut
       const totalCount = totalBookings?.total || 0
       const pendingCount = pendingBookings?.total || 0
       const confirmedCount = confirmedBookings?.total || 0
       const completedCount = completedBookings?.total || 0
       const cancelledCount = cancelledBookings?.total || 0
 
-      // Calcul des pourcentages
       const pendingPercentage =
         totalCount > 0 ? ((pendingCount / totalCount) * 100).toFixed(1) : '0.0'
       const confirmedPercentage =
@@ -430,7 +385,7 @@ export default class BookingsController {
           completed: completedCount,
           cancelled: cancelledCount,
           monthly_revenue: monthlyRevenue?.revenue || 0,
-          // Ajout des pourcentages pour corriger l'affichage 0.0%
+
           pending_percentage: pendingPercentage,
           confirmed_percentage: confirmedPercentage,
           completed_percentage: completedPercentage,
@@ -440,7 +395,6 @@ export default class BookingsController {
         },
       })
     } catch (error) {
-      console.error('Booking stats error:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch booking stats',
         error: error.message,
@@ -448,11 +402,6 @@ export default class BookingsController {
     }
   }
 
-  /**
-   * @tag Bookings - Availability
-   * @summary Obtenir les créneaux disponibles pour un service
-   * @description Récupère les créneaux disponibles pour un service à une date donnée
-   */
   async getAvailableSlots({ request, response }: HttpContext) {
     try {
       const serviceId = request.param('serviceId')
@@ -473,7 +422,6 @@ export default class BookingsController {
         })
       }
 
-      // Récupérer les réservations existantes pour cette date
       const existingBookings = await Booking.query()
         .where('service_id', serviceId)
         .where('status', '!=', 'cancelled')
@@ -483,7 +431,6 @@ export default class BookingsController {
         ])
         .orderBy('start_datetime', 'asc')
 
-      // Générer les créneaux disponibles (9h-18h par créneaux de 2h)
       const availableSlots = []
       const workingHours = {
         start: 9,
@@ -499,7 +446,6 @@ export default class BookingsController {
         const slotStart = targetDate.set({ hour, minute: 0, second: 0 })
         const slotEnd = slotStart.plus({ hours: workingHours.slotDuration })
 
-        // Vérifier si ce créneau est libre
         const isAvailable = !existingBookings.some((booking) => {
           return (
             (booking.startDatetime <= slotStart && booking.endDatetime > slotStart) ||
@@ -518,22 +464,101 @@ export default class BookingsController {
       return response.ok({
         service: {
           id: service.id,
-          title: service.title,
+          title: service.name,
         },
         date: targetDate.toISODate(),
         available_slots: availableSlots,
       })
     } catch (error) {
-      console.error('Get available slots error:', error)
       return response.status(500).send({
         error_message: 'Failed to fetch available slots',
       })
     }
   }
 
-  /**
-   * Valide les transitions de statut
-   */
+  async cancel({ request, response, auth }: HttpContext) {
+    try {
+      const id = request.param('id')
+      const user = auth.user!
+
+      // Récupérer la réservation avec les informations du service
+      const booking = await db
+        .from('bookings')
+        .select(
+          'bookings.*',
+          'services.prestataireId'
+        )
+        .join('services', 'bookings.service_id', 'services.id')
+        .where('bookings.id', id)
+        .first()
+
+      if (!booking) {
+        return response.status(404).send({
+          error_message: 'Réservation non trouvée',
+        })
+      }
+
+      // Vérifier que l'utilisateur a le droit d'annuler cette réservation
+      // Le client peut annuler sa propre réservation
+      // Le prestataire peut annuler les réservations de ses services
+      const isClient = booking.client_id === user.id
+      const isProvider = booking.prestataireId === user.id
+
+      if (!isClient && !isProvider) {
+        return response.status(403).send({
+          error_message: 'Vous n\'avez pas l\'autorisation d\'annuler cette réservation',
+        })
+      }
+
+      // Vérifier que la réservation peut être annulée
+      if (booking.status === 'cancelled') {
+        return response.status(400).send({
+          error_message: 'Cette réservation est déjà annulée',
+        })
+      }
+
+      if (booking.status === 'completed') {
+        return response.status(400).send({
+          error_message: 'Impossible d\'annuler une réservation terminée',
+        })
+      }
+
+      // Mettre à jour le statut à 'cancelled'
+      await db
+        .from('bookings')
+        .where('id', id)
+        .update({
+          status: 'cancelled',
+          updated_at: new Date(),
+        })
+
+      // Récupérer la réservation mise à jour
+      const updatedBooking = await db
+        .from('bookings')
+        .select(
+          'bookings.*',
+          'services.name as service_name',
+          'utilisateurs.first_name as client_first_name',
+          'utilisateurs.last_name as client_last_name',
+          'utilisateurs.email as client_email'
+        )
+        .join('services', 'bookings.service_id', 'services.id')
+        .join('utilisateurs', 'bookings.client_id', 'utilisateurs.id')
+        .where('bookings.id', id)
+        .first()
+
+      return response.ok({
+        message: 'Réservation annulée avec succès',
+        booking: updatedBooking,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        error_message: 'Erreur lors de l\'annulation de la réservation',
+        error: error.message,
+      })
+    }
+  }
+
   private validateStatusTransition(
     currentStatus: string,
     newStatus: string

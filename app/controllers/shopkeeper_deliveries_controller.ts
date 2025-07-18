@@ -8,22 +8,16 @@ import { shopkeeperDeliveryValidator } from '#validators/shopkeeper_delivery'
 import db from '@adonisjs/lucid/services/db'
 import CodeTemporaire from '#models/code_temporaire'
 import { validateDeliveryValidator } from '#validators/validate_delivery_validator'
+import { Resend } from 'resend'
 
 export default class ShopkeeperDeliveriesController {
-  /**
-   * Crée une nouvelle demande de livraison par un commerçant.
-   */
   public async create({ request, auth, response }: HttpContext) {
     try {
       const commercant = await auth.authenticate()
       const payload = await request.validateUsing(shopkeeperDeliveryValidator)
 
-      console.log('📦 Payload reçu:', payload)
-
-      // 1. Générer un numéro de suivi unique pour le colis
       const trackingNumber = `ECO-SHOP-${cuid()}`
 
-      // 2. Créer la demande de livraison
       const deliveryRequest = await ShopkeeperDelivery.create({
         commercantId: commercant.id,
         customerName: payload.customer_name,
@@ -36,9 +30,6 @@ export default class ShopkeeperDeliveriesController {
         status: 'pending_acceptance',
       })
 
-      console.log('✅ Demande de livraison créée:', deliveryRequest.serialize())
-
-      // 3. Créer le colis associé (sans annonce pour ce workflow)
       await Colis.create({
         annonceId: null,
         trackingNumber,
@@ -50,29 +41,8 @@ export default class ShopkeeperDeliveriesController {
         status: 'stored',
       })
 
-      console.log('✅ Colis créé avec tracking:', trackingNumber)
-
-      // 4. Notifier les livreurs via WebSocket
       if (Ws.io) {
         Ws.io.emit('new_shopkeeper_delivery', deliveryRequest)
-        console.log('📡 Notification WebSocket envoyée')
-      }
-
-      // 5. Log des champs additionnels pour debug (même s'ils ne sont pas stockés en DB pour l'instant)
-      if (payload.customer_phone) {
-        console.log('📞 Téléphone client:', payload.customer_phone)
-      }
-      if (payload.delivery_type) {
-        console.log('🚚 Type de livraison:', payload.delivery_type)
-      }
-      if (payload.starting_point) {
-        console.log('📍 Point de départ:', payload.starting_point)
-      }
-      if (payload.starting_type) {
-        console.log('🏠 Type de départ:', payload.starting_type)
-      }
-      if (payload.delivery_date) {
-        console.log('📅 Date souhaitée:', payload.delivery_date)
       }
 
       return response.created(deliveryRequest)
@@ -85,13 +55,9 @@ export default class ShopkeeperDeliveriesController {
     }
   }
 
-  /**
-   * Permet à un livreur d'accepter une livraison.
-   */
   public async accept({ params, auth, response }: HttpContext) {
     const user = await auth.authenticate()
 
-    // Assurer que l'utilisateur est bien un livreur
     const livreur = await db.from('livreurs').where('id', user.id).first()
     if (!livreur) {
       return response.forbidden({ message: 'Only delivery personnel can accept deliveries.' })
@@ -112,7 +78,6 @@ export default class ShopkeeperDeliveriesController {
       .where('id', deliveryRequest.commercantId)
       .first()
 
-    // Créer une entrée dans la table `livraisons` standard
     await Livraison.create({
       livreurId: livreur.id,
       pickupLocation: commercant?.address || 'Adresse du commerçant non trouvée',
@@ -121,22 +86,29 @@ export default class ShopkeeperDeliveriesController {
       price: deliveryRequest.price,
     })
 
-    // Générer le code de validation
     const validationCode = Math.floor(100000 + Math.random() * 900000).toString()
     await CodeTemporaire.create({
-      user_info: deliveryRequest.trackingNumber, // Utiliser le tracking number comme identifiant unique
+      user_info: deliveryRequest.trackingNumber,
       code: validationCode,
     })
 
-    // TODO: Envoyer un email au client avec le code et le lien de suivi
-    // EmailService.send({
-    //   to: deliveryRequest.customerEmail,
-    //   subject: `Votre livraison EcoDeli est en route !`,
-    //   html: `<h1>Bonjour ${deliveryRequest.customerName},</h1>
-    //          <p>Votre commande est acceptée par un livreur.</p>
-    //          <p>Suivez votre livraison ici : <a href="http://localhost:3000/app_client/tracking/${deliveryRequest.trackingNumber}">Suivi</a></p>
-    //          <p>À la réception, donnez ce code au livreur : <strong>${validationCode}</strong></p>`
-    // });
+    // Envoyer un email au client avec le code et le lien de suivi
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY!)
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || "noreplyecodeli@gmail.com",
+        to: deliveryRequest.customerEmail,
+        subject: `Votre livraison EcoDeli est en route !`,
+        html: `<h1>Bonjour ${deliveryRequest.customerName},</h1>
+               <p>Votre commande est acceptée par un livreur.</p>
+               <p>Suivez votre livraison ici : <a href="http://localhost:3000/app_client/tracking/${deliveryRequest.trackingNumber}">Suivi</a></p>
+               <p>À la réception, donnez ce code au livreur : <strong>${validationCode}</strong></p>`
+      })
+      console.log(`✅ Email de validation envoyé à ${deliveryRequest.customerEmail}`)
+    } catch (emailError) {
+      console.error('❌ Erreur lors de l\'envoi de l\'email:', emailError)
+      // On continue le processus même si l'email échoue
+    }
 
     const updatedDeliveryRequest = await db
       .from('shopkeeper_deliveries')

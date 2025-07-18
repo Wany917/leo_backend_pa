@@ -9,11 +9,7 @@ import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 
 export default class TrackingController {
-  /**
-   * @tag Tracking - Positions
-   * @summary Positions d'un livreur
-   * @description Historique des positions GPS d'un livreur avec filtres date
-   */
+
   async getLivreurPositions({ request, response }: HttpContext) {
     try {
       const livreurId = request.param('livreur_id')
@@ -57,11 +53,7 @@ export default class TrackingController {
     }
   }
 
-  /**
-   * @tag Tracking - Positions
-   * @summary Dernière position d'un livreur
-   * @description Position GPS la plus récente d'un livreur
-   */
+
   async getLastPosition({ request, response }: HttpContext) {
     try {
       const livreurId = request.param('livreur_id')
@@ -88,24 +80,20 @@ export default class TrackingController {
     }
   }
 
-  /**
-   * @tag Tracking - Livraisons
-   * @summary Suivi d'une livraison
-   * @description Données de tracking temps réel pour une livraison
-   */
+
   async getLivraisonTracking({ request, response, auth }: HttpContext) {
     try {
       const livraisonId = request.param('livraison_id')
       const user = auth.user!
 
-      // Vérifier que l'utilisateur a accès à cette livraison
+
       const livraison = await Livraison.query()
         .where('id', livraisonId)
         .preload('client')
         .preload('livreur')
         .firstOrFail()
 
-      // Vérifier les permissions
+
       const isClient = livraison.clientId === user.id
       const isLivreur = livraison.livreurId === user.id
       const isAdmin = await user.related('admin').query().first()
@@ -116,7 +104,7 @@ export default class TrackingController {
         })
       }
 
-      // Récupérer l'historique des positions
+
       const positions = await LivreurPosition.query()
         .where('livraison_id', livraisonId)
         .orderBy('created_at', 'asc')
@@ -146,14 +134,10 @@ export default class TrackingController {
     }
   }
 
-  /**
-   * @tag Tracking - Map
-   * @summary Livreurs actifs
-   * @description Liste des livreurs actuellement en ligne
-   */
+
   async getActiveLivreurs({ response, auth }: HttpContext) {
     try {
-      // Vérifier que c'est un admin
+
       const user = auth.user!
       const isAdmin = await user.related('admin').query().first()
 
@@ -163,7 +147,7 @@ export default class TrackingController {
         })
       }
 
-      // Récupérer la dernière position de chaque livreur actif
+
       const subQuery = LivreurPosition.query()
         .select('livreur_id')
         .max('created_at as max_created_at')
@@ -210,11 +194,7 @@ export default class TrackingController {
     }
   }
 
-  /**
-   * @tag Tracking - Position
-   * @summary Mettre à jour position livreur
-   * @description Permet au livreur de mettre à jour sa position GPS
-   */
+
   async updatePosition({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
@@ -227,7 +207,7 @@ export default class TrackingController {
         livraison_id: livraisonId,
       } = await request.validateUsing(updatePositionValidator)
 
-      // Vérifier que l'utilisateur est un livreur
+
       const livreur = await user.related('livreur').query().first()
       if (!livreur) {
         return response.forbidden({
@@ -235,7 +215,7 @@ export default class TrackingController {
         })
       }
 
-      // Créer l'enregistrement de position
+
       const position = await LivreurPosition.create({
         livreurId: livreur.id,
         livraisonId: livraisonId || null,
@@ -259,11 +239,7 @@ export default class TrackingController {
     }
   }
 
-  /**
-   * @tag Tracking - Search
-   * @summary Rechercher livreurs par zone
-   * @description Trouve les livreurs disponibles dans un rayon donné
-   */
+
   async searchNearbyDeliverers({ request, response }: HttpContext) {
     try {
       const {
@@ -273,7 +249,7 @@ export default class TrackingController {
         service_type: serviceType,
       } = await request.validateUsing(searchDeliveryZoneValidator)
 
-      // Requête SQL pour calculer la distance
+
       const nearbyLivreurs = await LivreurPosition.query()
         .select('*')
         .select(
@@ -316,7 +292,7 @@ export default class TrackingController {
           location: {
             latitude: pos.latitude,
             longitude: pos.longitude,
-            distance: Math.round((pos as any).$extras.distance * 100) / 100, // km avec 2 décimales
+            distance: Math.round((pos as any).$extras.distance * 100) / 100,
           },
           last_seen: pos.createdAt.toISO(),
         })),

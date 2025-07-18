@@ -8,7 +8,7 @@ import { DateTime } from 'luxon'
 import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ColisController {
-  // Méthode pour récupérer tous les colis (pour les administrateurs)
+
   async getAllColis({ request, response }: HttpContext) {
     try {
       const page = request.input('page', 1)
@@ -20,12 +20,12 @@ export default class ColisController {
         annonceQuery.preload('utilisateur' as ExtractModelRelations<Annonce>)
       })
 
-      // Filtrage par statut si fourni
+
       if (status) {
         query = query.where('status', status)
       }
 
-      // Recherche par numéro de suivi ou description
+
       if (search) {
         query = query.where((builder) => {
           builder
@@ -40,7 +40,7 @@ export default class ColisController {
         colis: colis.serialize(),
       })
     } catch (error) {
-      console.error('Error fetching all packages:', error)
+
       return response.status(500).json({
         error: 'Une erreur est survenue lors de la récupération des colis',
         details: error.message,
@@ -80,7 +80,7 @@ export default class ColisController {
       currentAddress: annonce.utilisateur.address,
     })
 
-    // Enregistrer l'historique initial
+
     await ColisLocationHistory.create({
       colisId: colis.id,
       locationType: 'client_address',
@@ -92,7 +92,7 @@ export default class ColisController {
 
     await colis.load('annonce')
 
-    // Retourner avec trackingNumber comme clé principale
+
     return response.created({
       colis: colis.serialize(),
       trackingNumber: colis.trackingNumber,
@@ -109,7 +109,7 @@ export default class ColisController {
       .preload('stockage')
       .firstOrFail()
 
-    // Obtenir l'historique de localisation
+
     const locationHistory = await ColisLocationHistory.query()
       .where('colis_id', colis.id)
       .orderBy('moved_at', 'desc')
@@ -144,7 +144,7 @@ export default class ColisController {
 
     const colis = await Colis.findByOrFail('tracking_number', trackingNumber)
 
-    // Mettre à jour la localisation
+
     colis.locationType = locationType
     colis.locationId = locationId
 
@@ -154,7 +154,7 @@ export default class ColisController {
 
     await colis.save()
 
-    // Enregistrer l'historique
+
     await ColisLocationHistory.create({
       colisId: colis.id,
       locationType: locationType,

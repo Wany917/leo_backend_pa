@@ -18,7 +18,7 @@ export default class UtilisateursController {
       
       return response.ok(users.map((user) => user.serialize()))
     } catch (error) {
-      console.error('Error in getRecent:', error)
+
       return response.internalServerError({ message: 'Failed to fetch recent users' })
     }
   }
@@ -35,7 +35,7 @@ export default class UtilisateursController {
       
       return response.ok(users.map((user) => user.serialize()))
     } catch (error) {
-      console.error('Erreur dans getIndex:', error)
+
       return response.notFound({ message: 'Utilisateurs not found' })
     }
   }

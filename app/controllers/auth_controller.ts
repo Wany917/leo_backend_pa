@@ -12,31 +12,7 @@ export default class AuthController {
     try {
       const { email, password } = await request.validateUsing(loginValidator)
 
-      // 🔍 DEBUG : Vérifier le payload exact reçu
-      console.log('🔍 DEBUG LOGIN - Raw payload:', { email, password })
-      console.log('🔍 DEBUG LOGIN - Email:', email)
-      console.log('🔍 DEBUG LOGIN - Password:', password)
-      console.log('🔍 DEBUG LOGIN - Password length:', password.length)
-      console.log(
-        '🔍 DEBUG LOGIN - Password chars:',
-        password.split('').map((c) => c.charCodeAt(0))
-      )
-
-      const existingUser = await Utilisateurs.findBy('email', email)
-      console.log('🔍 DEBUG LOGIN - User exists:', !!existingUser)
-
-      if (existingUser) {
-        console.log('🔍 DEBUG LOGIN - User state:', existingUser.state)
-        console.log('🔍 DEBUG LOGIN - User password hash exists:', !!existingUser.password)
-        console.log(
-          '🔍 DEBUG LOGIN - User password hash start:',
-          existingUser.password?.substring(0, 20)
-        )
-      }
-
-      console.log('🔍 DEBUG LOGIN - About to call verifyCredentials...')
       const user = await Utilisateurs.verifyCredentials(email, password)
-      console.log('🔍 DEBUG LOGIN - verifyCredentials SUCCESS!')
 
       if (user.state === 'closed') {
         return response.status(403).send({
@@ -57,9 +33,7 @@ export default class AuthController {
         token: token.value!.release(),
       })
     } catch (error) {
-      console.log('🔴 LOGIN ERROR:', error)
-      console.log('🔴 ERROR MESSAGE:', error.message)
-      console.log('🔴 ERROR CODE:', error.code)
+
       return response.status(401).send({ error_message: 'Unauthorized access', error: error })
     }
   }
@@ -68,7 +42,7 @@ export default class AuthController {
     try {
       const payload = await request.validateUsing(registerValidator)
 
-      console.log('🔍 DEBUG REGISTER - Payload received:', payload)
+
 
       const existingUtilisateurs = await Utilisateurs.findBy('email', payload.email)
       if (existingUtilisateurs) {
@@ -105,24 +79,16 @@ export default class AuthController {
         country: payload.country,
       })
 
-      // 🔍 DEBUG : Vérifier la création de l'utilisateur
-      console.log('🔍 DEBUG REGISTER - User created with ID:', user.id)
-      console.log('🔍 DEBUG REGISTER - Email saved:', user.email)
-      console.log('🔍 DEBUG REGISTER - Password hash exists:', !!user.password)
-      console.log('🔍 DEBUG REGISTER - Password hash length:', user.password?.length || 0)
 
-      // Créer un abonnement FREE par défaut (sans Stripe)
+
+
       await StripeService.createFreeSubscription(user.id)
 
       const token = await Utilisateurs.accessTokens.create(user)
 
       return response.created({ user: user, token: token.value!.release() })
     } catch (error) {
-      console.log('🔴 REGISTER ERROR:', error)
-      console.log('🔴 ERROR MESSAGE:', error.message)
-      console.log('🔴 ERROR TYPE:', typeof error)
 
-      // ✅ EXTRAIRE CORRECTEMENT LE MESSAGE D'ERREUR
       let errorMessage = 'Registration failed'
 
       if (error instanceof Error) {
@@ -133,7 +99,7 @@ export default class AuthController {
         errorMessage = error.message
       }
 
-      console.log('🔴 FINAL ERROR MESSAGE:', errorMessage)
+
       response.status(400).send({ error_message: errorMessage })
     }
   }
@@ -142,7 +108,7 @@ export default class AuthController {
     try {
       const user = await auth.authenticate()
 
-      // Récupérer l'utilisateur avec toutes ses relations
+
       const fullUser = await Utilisateurs.query()
         .where('id', user.id)
         .preload('admin' as any)
@@ -152,7 +118,7 @@ export default class AuthController {
         .preload('commercant' as any)
         .firstOrFail()
 
-      // Check if account is closed, banned, or deactivated
+
       if (fullUser.state === 'closed' || fullUser.state === 'banned') {
         return response.status(403).send({
           error_message: 'Account unavailable. Please contact support.',
@@ -161,7 +127,7 @@ export default class AuthController {
         })
       }
 
-      // Ajouter le rôle à la réponse
+
       const userData = fullUser.serialize()
 
       return response.ok(userData)

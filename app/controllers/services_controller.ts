@@ -8,8 +8,7 @@ import TransactionPortefeuille from '#models/transaction_portefeuille'
 import { DateTime } from 'luxon'
 import { serviceValidator } from '#validators/create_service'
 import db from '@adonisjs/lucid/services/db'
-// import type { ModelObject } from '@adonisjs/lucid/types/model'
-// import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
+
 import Utilisateurs from '#models/utilisateurs'
 
 export default class ServicesController {
@@ -22,7 +21,7 @@ export default class ServicesController {
       const sortBy = qs.sort_by || 'created_at'
       const sortOrder = qs.sort_order === 'asc' ? 'asc' : 'desc'
 
-      // Validation des paramètres
+
       if (Number.isNaN(page) || page < 1) {
         return response.status(400).send({
           error_message: 'Invalid page number',
@@ -56,10 +55,10 @@ export default class ServicesController {
         }
       }
 
-      // On retire la pagination pour simplifier
+
       const services = await query.orderBy(sortBy, sortOrder)
 
-      // Charger les utilisateurs séparément avec une seule requête
+
       const prestataireIds = services.map((s) => s.prestataire?.id).filter(Boolean) as number[]
       const users = await Utilisateurs.query().whereIn('id', prestataireIds)
       const usersMap = new Map(users.map((u) => [u.id, u]))
@@ -88,8 +87,14 @@ export default class ServicesController {
         }
       })
 
-      console.log('Backend services_controller.ts - Raw services from DB:', services.map(s => ({ id: s.id, prestataireId: s.prestataireId, name: s.name })));
-      console.log('Backend services_controller.ts - Mapped services:', mappedServices.map(s => ({ id: s.id, prestataireId: s.prestataireId, name: s.name })));
+      console.log(
+        'Backend services_controller.ts - Raw services from DB:',
+        services.map((s) => ({ id: s.id, prestataireId: s.prestataireId, name: s.name }))
+      )
+      console.log(
+        'Backend services_controller.ts - Mapped services:',
+        mappedServices.map((s) => ({ id: s.id, prestataireId: s.prestataireId, name: s.name }))
+      )
 
       return response.ok(mappedServices)
     } catch (error) {
@@ -119,7 +124,7 @@ export default class ServicesController {
         requires_materials,
       } = await request.validateUsing(serviceValidator)
 
-      // Validate required fields
+
       if (!name || !description || !price || !location) {
         return response.status(400).send({
           error_message:
@@ -127,14 +132,14 @@ export default class ServicesController {
         })
       }
 
-      // Validate price is a positive number
+
       if (Number.isNaN(price) || price <= 0) {
         return response.status(400).send({
           error_message: 'Price must be a positive number',
         })
       }
 
-      // Validate prestataireId is a valid number if provided
+
       if (prestataireId !== undefined && (Number.isNaN(prestataireId) || prestataireId <= 0)) {
         return response.status(400).send({
           error_message: 'prestataireId must be a valid positive number',
@@ -150,12 +155,12 @@ export default class ServicesController {
         service_type_id: serviceTypeId || null,
         prestataireId: prestataireId ? Number.parseInt(prestataireId.toString()) : undefined,
         location,
-        status: 'pending', // Nouveaux services sont toujours en attente de validation
+        status: 'pending',
         duration: duration || null,
 
         home_service: home_service !== undefined ? home_service : true,
         requires_materials: requires_materials !== undefined ? requires_materials : false,
-        isActive: false, // Inactif jusqu'à validation admin
+        isActive: false,
       })
 
       return response.created({
@@ -186,9 +191,7 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * Récupère un service spécifique
-   */
+
   async show({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
@@ -213,9 +216,7 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * Met à jour un service existant
-   */
+
   async update({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
@@ -246,14 +247,14 @@ export default class ServicesController {
 
       const service = await Service.findOrFail(serviceId)
 
-      // Validate price if provided
+
       if (price !== undefined && (Number.isNaN(price) || price <= 0)) {
         return response.status(400).send({
           error_message: 'Price must be a positive number',
         })
       }
 
-      // Validate prestataireId if provided
+
       if (prestataireId !== undefined && (Number.isNaN(prestataireId) || prestataireId <= 0)) {
         return response.status(400).send({
           error_message: 'prestataireId must be a valid positive number',
@@ -290,7 +291,7 @@ export default class ServicesController {
     } catch (error) {
       console.error('Service update error:', error)
 
-      // Handle specific database errors
+
       if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.code === '23503') {
         return response.status(400).send({
           error_message: 'Invalid prestataireId: The specified service provider does not exist',
@@ -310,15 +311,13 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * Supprime un service
-   */
+
   async delete({ request, response }: HttpContext) {
     try {
       const id = request.param('id')
       const serviceId = Number.parseInt(id)
 
-      // Validate ID is a valid number
+
       if (Number.isNaN(serviceId) || serviceId <= 0) {
         return response.status(400).send({
           error_message: 'Invalid service ID: must be a positive number',
@@ -333,14 +332,14 @@ export default class ServicesController {
     } catch (error) {
       console.error('Service deletion error:', error)
 
-      // Handle service not found
+
       if (error.code === 'E_ROW_NOT_FOUND') {
         return response.status(404).send({
           error_message: 'Service not found',
         })
       }
 
-      // Handle foreign key constraint errors
+
       if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.code === '23503') {
         return response.status(400).send({
           error_message: 'Cannot delete service: it is referenced by other records',
@@ -354,11 +353,7 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * @tag Services - Géolocalisation
-   * @summary Services géolocalisés à proximité
-   * @description Services à la personne géolocalisés conforme au cahier des charges page 2
-   */
+
   async getNearbyServices({ request, response }: HttpContext) {
     try {
       const { lat, lng, radius } = request.params()
@@ -379,12 +374,15 @@ export default class ServicesController {
         .orderBy('price', 'asc')
         .paginate(page, limit)
 
-      console.log('Backend services_controller.ts - Services query result:', services.all().map(s => ({
-        id: s.id,
-        prestataireId: s.prestataireId,
-        name: s.name,
-        serialized: s.serialize()
-      })));
+      console.log(
+        'Backend services_controller.ts - Services query result:',
+        services.all().map((s) => ({
+          id: s.id,
+          prestataireId: s.prestataireId,
+          name: s.name,
+          serialized: s.serialize(),
+        }))
+      )
 
       const prestataireIds = services.map((s) => s.prestataire?.id).filter(Boolean) as number[]
       const users = await Utilisateurs.query().whereIn('id', prestataireIds)
@@ -397,7 +395,7 @@ export default class ServicesController {
           const user = service.prestataire ? usersMap.get(service.prestataire.id) : null
           return {
             ...service.serialize(),
-            distance_km: Math.random() * radiusKm, // TODO: Implémenter le calcul réel de la distance
+            distance_km: Math.random() * radiusKm,
             prestataire_name: user ? `${user.first_name} ${user.last_name}` : 'Prestataire inconnu',
           }
         }),
@@ -446,7 +444,7 @@ export default class ServicesController {
         servicesQuery.where('is_active', true)
       })
 
-      // Charger les utilisateurs séparément avec une seule requête
+
       const providerIds = providers.map((p) => p.id)
       const users = await Utilisateurs.query().whereIn('id', providerIds)
       const usersMap = new Map(users.map((u) => [u.id, u]))
@@ -462,7 +460,6 @@ export default class ServicesController {
           rating: provider.rating,
           active_services_count: provider.services?.length || 0,
           coordinates: {
-            // TODO: Implémenter les coordonnées réelles des prestataires
             lat: 48.8566 + (Math.random() - 0.5) * 0.1,
             lng: 2.3522 + (Math.random() - 0.5) * 0.1,
           },
@@ -483,21 +480,17 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * @tag Services - Analytics
-   * @summary Analytics des services (Top 5 prestations)
-   * @description Données analytics conformes au cahier des charges page 8 - Top 5 prestations les plus demandées
-   */
+
   async getServiceAnalytics({ response }: HttpContext) {
     try {
-      // Stats générales
+
       const totalServices = await Service.query().count('* as total')
       const activeServices = await Service.query().where('is_active', true).count('* as total')
       const completedServices = await Service.query()
         .where('status', 'completed')
         .count('* as total')
 
-      // Top 5 des prestations les plus demandées (requis par cahier des charges page 8)
+
       const topServices = await db
         .from('services')
         .select('name', 'service_type_id as serviceTypeId')
@@ -506,7 +499,7 @@ export default class ServicesController {
         .orderBy('demand_count', 'desc')
         .limit(5)
 
-      // Répartition par type de service
+
       const servicesByType = await db
         .from('services')
         .join('service_types', 'services.service_type_id', 'service_types.id')
@@ -515,7 +508,7 @@ export default class ServicesController {
         .groupBy('service_types.name')
         .orderBy('count', 'desc')
 
-      // Statistiques financières
+
       const revenueStats = await db
         .from('services')
         .where('status', 'completed')
@@ -527,7 +520,7 @@ export default class ServicesController {
         )
         .first()
 
-      // Top 5 prestataires les plus actifs
+
       const topProviders = await db
         .from('services')
         .join('prestataires', 'services.prestataireId', 'prestataires.id')
@@ -570,11 +563,7 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * @tag Services - Validation Admin
-   * @summary Validation d'un service par l'admin
-   * @description Workflow de validation des services par les administrateurs
-   */
+
   async validateService({ request, response }: HttpContext) {
     try {
       const serviceId = request.param('id')
@@ -593,7 +582,7 @@ export default class ServicesController {
       const service = await Service.findOrFail(serviceId)
       await service.load('prestataire')
 
-      // Charger l'utilisateur séparément
+
       const prestataireId = service.prestataire?.id
       const user = prestataireId ? await Utilisateurs.find(prestataireId) : null
 
@@ -668,11 +657,7 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * @tag Services - Admin
-   * @summary Services en attente de validation avec justificatifs
-   * @description Récupère tous les services en statut 'pending' avec leurs pièces justificatives
-   */
+
   async getPendingServices({ response }: HttpContext) {
     try {
       const pendingServices = await Service.query()
@@ -681,7 +666,7 @@ export default class ServicesController {
         .preload('serviceType')
         .orderBy('created_at', 'desc')
 
-      // Charger les utilisateurs séparément
+
       const prestataireIds = pendingServices
         .map((s) => s.prestataire?.id)
         .filter(Boolean) as number[]
@@ -738,14 +723,9 @@ export default class ServicesController {
     }
   }
 
-  // ===============================================
-  // 🆕 SYSTÈME PAIEMENT SERVICES PRESTATAIRES CLIENTS
-  // ===============================================
 
-  /**
-   * 💰 FINALISER SERVICE ET DISTRIBUER GAINS
-   * Marque un service comme terminé et distribue les gains au prestataire
-   */
+
+
   async completeServiceAndDistributePayment({ request, response, auth }: HttpContext) {
     try {
       const serviceId = request.param('id')
@@ -770,7 +750,7 @@ export default class ServicesController {
         })
       }
 
-      // Vérifier que le service est payé et en cours
+
       if (service.status !== 'paid' && service.status !== 'in_progress') {
         return response.badRequest({
           success: false,
@@ -778,11 +758,11 @@ export default class ServicesController {
         })
       }
 
-      // Calculer la commission EcoDeli (8% pour les services)
+
       const commission = service.price * 0.08
       const montantPrestataire = service.price - commission
 
-      // Récupérer ou créer le portefeuille du prestataire
+
       let portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', service.prestataireId)
         .where('is_active', true)
@@ -797,12 +777,12 @@ export default class ServicesController {
         })
       }
 
-      // Ajouter les gains directement au solde disponible
+
       const ancienSolde = portefeuille.soldeDisponible
       portefeuille.soldeDisponible = ancienSolde + montantPrestataire
       await portefeuille.save()
 
-      // Enregistrer la transaction de gain
+
       await TransactionPortefeuille.create({
         portefeuilleId: portefeuille.id,
         utilisateurId: service.prestataireId,
@@ -823,7 +803,7 @@ export default class ServicesController {
         }),
       })
 
-      // Marquer le service comme terminé
+
       service.status = 'completed'
       await service.save()
 
@@ -852,15 +832,12 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * 📊 RÉCUPÉRER GAINS PRESTATAIRE
-   * Statistiques des gains pour un prestataire client
-   */
+
   async getProviderEarnings({ response, auth }: HttpContext) {
     try {
       const user = auth.user!
 
-      // Vérifier que l'utilisateur est un prestataire
+
       const prestataire = await Prestataire.query().where('id', user.id).first()
       if (!prestataire) {
         return response.badRequest({
@@ -869,7 +846,7 @@ export default class ServicesController {
         })
       }
 
-      // Récupérer le portefeuille
+
       const portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', user.id)
         .where('is_active', true)
@@ -889,7 +866,7 @@ export default class ServicesController {
         })
       }
 
-      // Récupérer les transactions de gains (services)
+
       const gainsTransactions = await TransactionPortefeuille.query()
         .where('portefeuille_id', portefeuille.id)
         .where('type_transaction', 'liberation')
@@ -898,7 +875,7 @@ export default class ServicesController {
 
       const gainsTotaux = gainsTransactions.reduce((total, t) => total + t.montant, 0)
 
-      // Gains du mois en cours
+
       const debutMois = new Date()
       debutMois.setDate(1)
       debutMois.setHours(0, 0, 0, 0)
@@ -907,7 +884,7 @@ export default class ServicesController {
         .filter((t) => new Date(t.createdAt.toString()) >= debutMois)
         .reduce((total, t) => total + t.montant, 0)
 
-      // Gains de la semaine
+
       const debutSemaine = new Date()
       debutSemaine.setDate(debutSemaine.getDate() - debutSemaine.getDay())
       debutSemaine.setHours(0, 0, 0, 0)
@@ -916,7 +893,7 @@ export default class ServicesController {
         .filter((t) => new Date(t.createdAt.toString()) >= debutSemaine)
         .reduce((total, t) => total + t.montant, 0)
 
-      // Services complétés
+
       const servicesCompletes = await Service.query()
         .where('prestataireId', user.id)
         .where('status', 'completed')
@@ -958,15 +935,12 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * 🎯 SERVICES EN ATTENTE DE PAIEMENT
-   * Liste des services en attente de paiement pour un prestataire
-   */
+
   async getPendingPaymentServices({ response, auth }: HttpContext) {
     try {
       const user = auth.user!
 
-      // Vérifier que l'utilisateur est un prestataire
+
       const prestataire = await Prestataire.query().where('id', user.id).first()
       if (!prestataire) {
         return response.badRequest({
@@ -975,7 +949,7 @@ export default class ServicesController {
         })
       }
 
-      // Récupérer les services en attente de paiement ou en cours
+
       const servicesPendants = await Service.query()
         .where('prestataireId', user.id)
         .whereIn('status', ['scheduled', 'in_progress', 'paid'])
@@ -988,7 +962,7 @@ export default class ServicesController {
       }
 
       const montantTotal = servicesPendants.reduce((total, service) => {
-        // Calculer les gains nets (prix - commission 8%)
+
         return total + service.price * 0.92
       }, 0)
 
@@ -1022,15 +996,12 @@ export default class ServicesController {
     }
   }
 
-  /**
-   * 📈 TABLEAU DE BORD PRESTATAIRE
-   * Vue d'ensemble des performances pour un prestataire client
-   */
+
   async getProviderDashboard({ response, auth }: HttpContext) {
     try {
       const user = auth.user!
 
-      // Vérifier que l'utilisateur est un prestataire
+
       const prestataire = await Prestataire.query().where('id', user.id).first()
       if (!prestataire) {
         return response.badRequest({
@@ -1039,7 +1010,7 @@ export default class ServicesController {
         })
       }
 
-      // Statistiques générales
+
       const statsGenerales = await Service.query()
         .where('prestataireId', user.id)
         .select(
@@ -1052,19 +1023,19 @@ export default class ServicesController {
         )
         .first()
 
-      // Portefeuille
+
       const portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', user.id)
         .where('is_active', true)
         .first()
 
-      // Services récents
+
       const servicesRecents = await Service.query()
         .where('prestataireId', user.id)
         .orderBy('updated_at', 'desc')
         .limit(5)
 
-      // Évolution mensuelle (derniers 6 mois)
+
       const evolutionMensuelle = []
       for (let i = 5; i >= 0; i--) {
         const date = new Date()
@@ -1082,7 +1053,7 @@ export default class ServicesController {
         evolutionMensuelle.push({
           mois: date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' }),
           services_count: statsMonth?.$extras.services_count || 0,
-          revenus: (statsMonth?.$extras.revenus || 0) * 0.92, // Revenus nets
+          revenus: (statsMonth?.$extras.revenus || 0) * 0.92,
         })
       }
 

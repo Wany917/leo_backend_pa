@@ -15,14 +15,10 @@ import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 
 export default class AdminController {
-  /**
-   * @tag Admin - Gestion
-   * @summary Lister tous les administrateurs
-   * @description Récupère la liste complète des administrateurs avec leurs informations utilisateur
-   */
+
   async index({ response }: HttpContext) {
     try {
-      // Utiliser une requête JOIN au lieu de preload pour éviter les erreurs TypeScript
+
       const admins = await db
         .from('admins')
         .join('utilisateurs', 'admins.id', 'utilisateurs.id')
@@ -39,34 +35,30 @@ export default class AdminController {
     }
   }
 
-  /**
-   * @tag Admin - Gestion
-   * @summary Créer un nouvel administrateur
-   * @description Ajoute les privilèges admin à un utilisateur existant
-   */
+
   async create({ request, response }: HttpContext) {
     try {
       const { id, privileges } = await request.validateUsing(adminValidator)
 
-      // Vérifier si l'utilisateur existe
+
       const user = await Utilisateurs.find(id)
       if (!user) {
         return response.status(404).send({ error_message: 'User not found' })
       }
 
-      // Vérifier si l'admin existe déjà
+
       const existingAdmin = await Admin.find(id)
       if (existingAdmin) {
         return response.status(400).send({ error_message: 'User is already an admin' })
       }
 
-      // Créer l'admin avec privilège par défaut
+
       const admin = await Admin.create({
         id,
         privileges,
       })
 
-      // Récupérer les données complètes avec une requête JOIN
+
       const adminWithUser = await db
         .from('admins')
         .join('utilisateurs', 'admins.id', 'utilisateurs.id')
@@ -86,11 +78,7 @@ export default class AdminController {
     }
   }
 
-  /**
-   * @tag Admin - Utilisateurs
-   * @summary Créer un utilisateur complet avec rôles
-   * @description Crée un nouvel utilisateur avec email et assigne les rôles sélectionnés
-   */
+
   async createUserWithEmail({ request, response }: HttpContext) {
     try {
       const {
@@ -107,13 +95,13 @@ export default class AdminController {
         privileges,
       } = await request.validateUsing(adminUserCreationValidator)
 
-      // Check if email already exists
+
       const existingUser = await Utilisateurs.findBy('email', email.toLowerCase())
       if (existingUser) {
         return response.status(400).send({ error_message: 'This email address is already used' })
       }
 
-      // Create the user
+
       const user = await Utilisateurs.create({
         first_name,
         last_name,
@@ -127,7 +115,7 @@ export default class AdminController {
         state: 'open',
       })
 
-      // Create subscription for the user
+
       await Subscription.create({
         utilisateur_id: user.id,
         subscription_type: 'free',
@@ -135,7 +123,7 @@ export default class AdminController {
         start_date: DateTime.now(),
       })
 
-      // Create roles based on selected roles array
+
       if (roles && roles.length > 0) {
         for (const role of roles) {
           switch (role) {
@@ -170,14 +158,14 @@ export default class AdminController {
         }
       }
 
-      // Always create a client role as it's the default
+
       await Client.create({
         id: user.id,
         loyalty_points: 0,
         preferred_payment_method: null,
       })
 
-      // Récupérer les informations complètes de l'utilisateur créé
+
       const fullUser = await db
         .from('utilisateurs')
         .leftJoin('admins', 'utilisateurs.id', 'admins.id')
@@ -203,7 +191,7 @@ export default class AdminController {
         },
       })
     } catch (error) {
-      console.error('Error creating user:', error)
+
       return response
         .status(500)
         .send({ error_message: 'Failed to create user', error: error.message })
@@ -249,7 +237,7 @@ export default class AdminController {
       admin.privileges = privileges
       await admin.save()
 
-      // Récupérer les données avec JOIN au lieu de preload
+
       const adminWithUser = await db
         .from('admins')
         .join('utilisateurs', 'admins.id', 'utilisateurs.id')
@@ -289,10 +277,10 @@ export default class AdminController {
     try {
       const userId = request.param('id')
 
-      // Find and update the user
+
       const user = await Utilisateurs.findOrFail(userId)
 
-      // Basculer automatiquement le statut
+
       const newState = user.state === 'open' ? 'closed' : 'open'
       user.state = newState
       await user.save()
@@ -308,7 +296,7 @@ export default class AdminController {
         },
       })
     } catch (error) {
-      console.error('Error toggling user status:', error)
+
       if (error.code === 'E_ROW_NOT_FOUND') {
         return response.status(404).send({ error_message: 'User not found' })
       }
@@ -318,67 +306,64 @@ export default class AdminController {
     }
   }
 
-  /**
-   * Supprimer complètement un utilisateur et toutes ses relations
-   */
+
   async deleteUser({ request, response }: HttpContext) {
     try {
       const userId = request.param('id')
 
-      // Vérifier que l'utilisateur existe
+
       const user = await Utilisateurs.findOrFail(userId)
 
-      console.log(`🗑️ Admin Controller - Suppression utilisateur ID: ${userId}`)
 
-      // Supprimer toutes les relations en premier (pour éviter les contraintes FK)
-      // Note: AdonisJS gère automatiquement les suppressions en cascade si configuré
+
+
       try {
         await Admin.query().where('id', userId).delete()
       } catch (e) {
-        /* L'admin peut ne pas exister */
+
       }
 
       try {
         await Client.query().where('id', userId).delete()
       } catch (e) {
-        /* Le client peut ne pas exister */
+
       }
 
       try {
         await Livreur.query().where('id', userId).delete()
       } catch (e) {
-        /* Le livreur peut ne pas exister */
+
       }
 
       try {
         await Prestataire.query().where('id', userId).delete()
       } catch (e) {
-        /* Le prestataire peut ne pas exister */
+
       }
 
       try {
         await Commercant.query().where('id', userId).delete()
       } catch (e) {
-        /* Le commercant peut ne pas exister */
+
       }
 
       try {
         await Subscription.query().where('utilisateur_id', userId).delete()
       } catch (e) {
-        /* L'abonnement peut ne pas exister */
+
       }
 
-      // Supprimer l'utilisateur principal en dernier
+
       await user.delete()
 
-      console.log(`✅ Admin Controller - Utilisateur ${userId} supprimé avec succès`)
+
 
       return response.ok({
         message: 'User deleted successfully',
         deleted_user_id: userId,
       })
     } catch (error) {
-      console.error('Error deleting user:', error)
+
       if (error.code === 'E_ROW_NOT_FOUND') {
         return response.status(404).send({ error_message: 'User not found' })
       }
@@ -388,14 +373,10 @@ export default class AdminController {
     }
   }
 
-  /**
-   * @tag Admin - Services Dashboard
-   * @summary Dashboard analytics des services
-   * @description Stats générales, Top 5 prestations et analytics conformes au cahier des charges page 8
-   */
+
   async getServicesDashboard({ response }: HttpContext) {
     try {
-      // Stats générales services
+
       const totalServices = await Service.query().count('* as total')
       const activeServices = await Service.query().where('is_active', true).count('* as total')
       const completedServices = await Service.query()
@@ -403,7 +384,7 @@ export default class AdminController {
         .count('* as total')
       const pendingServices = await Service.query().where('status', 'scheduled').count('* as total')
 
-      // Top 5 des prestations les plus demandées (requis cahier des charges)
+
       const topServices = await db
         .from('services')
         .join('service_types', 'services.service_type_id', 'service_types.id')
@@ -414,7 +395,7 @@ export default class AdminController {
         .orderBy('demand_count', 'desc')
         .limit(5)
 
-      // Top 5 prestataires les plus actifs
+
       const topProviders = await db
         .from('services')
         .join('prestataires', 'services.prestataireId', 'prestataires.id')
@@ -436,7 +417,7 @@ export default class AdminController {
         .orderBy('services_count', 'desc')
         .limit(5)
 
-      // Répartition par type de service
+
       const servicesByType = await db
         .from('services')
         .join('service_types', 'services.service_type_id', 'service_types.id')
@@ -446,7 +427,7 @@ export default class AdminController {
         .groupBy('service_types.name')
         .orderBy('count', 'desc')
 
-      // Statistiques financières mensuelles (simplifiée)
+
       const monthlyRevenue = await db
         .from('services')
         .where('status', 'completed')
@@ -475,7 +456,7 @@ export default class AdminController {
         generated_at: DateTime.now().toISO(),
       })
     } catch (error) {
-      console.error('Admin services dashboard error:', error)
+
       return response.status(500).send({
         error_message: 'Failed to fetch services dashboard',
         error: error.message,
@@ -483,11 +464,7 @@ export default class AdminController {
     }
   }
 
-  /**
-   * @tag Admin - Validation Prestataires
-   * @summary Validation d'un prestataire par l'admin
-   * @description Approuve/rejette un prestataire conforme au cahier des charges page 6
-   */
+
   async validatePrestataire({ request, response }: HttpContext) {
     try {
       const prestataireId = request.param('id')
@@ -495,25 +472,25 @@ export default class AdminController {
         validatePrestataireValidator
       )
 
-      // Vérifier que le prestataire existe
+
       const prestataire = await Prestataire.findOrFail(prestataireId)
       const user = await Utilisateurs.findOrFail(prestataireId)
 
       if (validation_status === 'approved') {
-        // Activer le compte utilisateur si approuvé
+
         user.state = 'open'
         await user.save()
 
-        // Activer tous les services du prestataire
+
         await Service.query()
           .where('prestataireId', prestataireId)
           .update({ is_active: true, status: 'scheduled' })
       } else if (validation_status === 'rejected') {
-        // Suspendre le compte
+
         user.state = 'closed'
         await user.save()
 
-        // Désactiver tous les services du prestataire
+
         await Service.query()
           .where('prestataireId', prestataireId)
           .update({ is_active: false, status: 'cancelled' })
@@ -537,7 +514,7 @@ export default class AdminController {
         admin_comments: admin_comments || null,
       })
     } catch (error) {
-      console.error('Prestataire validation error:', error)
+
       return response.status(500).send({
         error_message: 'Failed to validate prestataire',
         error: error.message,
@@ -545,17 +522,14 @@ export default class AdminController {
     }
   }
 
-  /**
-   * Génération de la facturation mensuelle automatique
-   * Conforme au cahier des charges page 6 : "facturation automatique mensuelle"
-   */
+
   async generateFacturationMensuelle({ request, response }: HttpContext) {
     try {
       const { month, year } = request.qs()
       const targetMonth = month || DateTime.now().month
       const targetYear = year || DateTime.now().year
 
-      // Calculer les dates de début et fin du mois
+
       const startOfMonth = DateTime.fromObject({
         year: Number.parseInt(targetYear),
         month: Number.parseInt(targetMonth),
@@ -563,7 +537,7 @@ export default class AdminController {
       })
       const endOfMonth = startOfMonth.endOf('month')
 
-      // Récupérer tous les services complétés du mois
+
       const completedServices = await db
         .from('services')
         .join('prestataires', 'services.prestataireId', 'prestataires.id')
@@ -584,7 +558,7 @@ export default class AdminController {
           'services.id as service_id'
         )
 
-      // Définir le type pour les factures
+
       interface FactureData {
         prestataire: {
           id: number
@@ -604,7 +578,7 @@ export default class AdminController {
         service_count: number
       }
 
-      // Grouper par prestataire pour créer les factures
+
       const facturesByPrestataire: Record<number, FactureData> = {}
       completedServices.forEach((service) => {
         const prestataireId = service.prestataireId
@@ -622,7 +596,7 @@ export default class AdminController {
           }
         }
 
-        // Calculer la commission EcoDeli (ex: 15%)
+
         const commissionRate = 0.15
         const prestataireAmount = service.price * (1 - commissionRate)
 
@@ -639,7 +613,7 @@ export default class AdminController {
         facturesByPrestataire[prestataireId].service_count += 1
       })
 
-      // Transformer en array
+
       const factures = Object.values(facturesByPrestataire)
 
       return response.ok({
@@ -659,7 +633,7 @@ export default class AdminController {
         })),
       })
     } catch (error) {
-      console.error('Monthly billing generation error:', error)
+
       return response.status(500).send({
         error_message: 'Failed to generate monthly billing',
         error: error.message,
@@ -667,14 +641,12 @@ export default class AdminController {
     }
   }
 
-  /**
-   * Gestion des types de services
-   */
+
   async getServiceTypes({ response }: HttpContext) {
     try {
       const serviceTypes = await ServiceType.query().orderBy('name', 'asc')
 
-      // Ajouter le nombre de services par type
+
       const typesWithStats = await Promise.all(
         serviceTypes.map(async (type) => {
           const serviceCount = await Service.query()
@@ -693,7 +665,7 @@ export default class AdminController {
         total_types: typesWithStats.length,
       })
     } catch (error) {
-      console.error('Get service types error:', error)
+
       return response.status(500).send({
         error_message: 'Failed to fetch service types',
         error: error.message,
@@ -701,19 +673,17 @@ export default class AdminController {
     }
   }
 
-  /**
-   * Activation/désactivation d'un type de service
-   */
+
   async toggleServiceType({ request, response }: HttpContext) {
     try {
       const typeId = request.param('id')
       const serviceType = await ServiceType.findOrFail(typeId)
 
-      // Inverser le statut
+
       serviceType.is_active = !serviceType.is_active
       await serviceType.save()
 
-      // Si désactivé, désactiver aussi tous les services de ce type
+
       if (!serviceType.is_active) {
         await Service.query().where('service_type_id', typeId).update({ is_active: false })
       }
@@ -723,7 +693,7 @@ export default class AdminController {
         service_type: serviceType.serialize(),
       })
     } catch (error) {
-      console.error('Toggle service type error:', error)
+
       return response.status(500).send({
         error_message: 'Failed to toggle service type',
         error: error.message,

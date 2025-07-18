@@ -292,8 +292,6 @@ export default class PortefeuilleController {
       const user = auth.user!
       const { payment_intent_id: paymentIntentId } = request.only(['payment_intent_id'])
 
-      console.log('🔄 Confirmation recharge cagnotte:', { paymentIntentId, userId: user.id })
-
       if (!paymentIntentId) {
         return response.badRequest({
           success: false,
@@ -354,8 +352,6 @@ export default class PortefeuilleController {
           stripe_payment_intent: paymentIntentId,
         }),
       })
-
-      console.log(`✅ Cagnotte rechargée: ${montantRecharge}€ pour client ${user.id}`)
 
       return response.ok({
         success: true,
@@ -445,8 +441,6 @@ export default class PortefeuilleController {
           reference_id: referenceId,
         }),
       })
-
-      console.log(`💸 Paiement cagnotte: ${montant}€ pour ${type} ${referenceId}`)
 
       return response.ok({
         success: true,

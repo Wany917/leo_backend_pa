@@ -90,9 +90,9 @@ export default class Prestataire extends BaseModel {
       const validRatings = ratings
         .map((rating) => {
           const numRating =
-            typeof rating.overall_rating === 'string'
-              ? Number.parseFloat(rating.overall_rating)
-              : rating.overall_rating
+            typeof rating.overallRating === 'string'
+              ? Number.parseFloat(rating.overallRating)
+              : rating.overallRating
           return !isNaN(numRating) ? numRating : null
         })
         .filter((rating) => rating !== null) as number[]
