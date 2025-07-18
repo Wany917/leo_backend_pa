@@ -56,8 +56,12 @@ export default class StripeService {
     const customerId = await this.getOrCreateStripeCustomer(utilisateur)
     const plan = SUBSCRIPTION_PLANS[planType.toUpperCase() as keyof typeof SUBSCRIPTION_PLANS]
 
-    if (!plan || !plan.stripePriceId) {
-      throw new Error(`Plan invalide ou non configuré: ${planType}`)
+    if (!plan) {
+      throw new Error(`Plan invalide: ${planType}`)
+    }
+
+    if (!plan.stripePriceId) {
+      throw new Error(`Configuration Stripe manquante: STRIPE_PRICE_${planType.toUpperCase()}_MONTHLY doit être défini dans les variables d'environnement`)
     }
 
     const session = await stripe.checkout.sessions.create({

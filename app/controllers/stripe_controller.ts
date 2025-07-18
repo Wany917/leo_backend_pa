@@ -10,13 +10,6 @@ import {
 import stripe from '#config/stripe'
 
 export default class StripeController {
-  /**
-   * 🎯 GESTION DES ABONNEMENTS
-   */
-
-  /**
-   * Crée une session de checkout pour un abonnement
-   */
   async createSubscriptionCheckout({ request, response, auth }: HttpContext) {
     try {
       const utilisateur = auth.user as Utilisateurs
@@ -32,14 +25,11 @@ export default class StripeController {
       console.error('❌ Erreur création checkout:', error)
       return response.internalServerError({
         success: false,
-        message: 'Erreur lors de la création du checkout',
+        message: error.message || 'Erreur lors de la création du checkout',
       })
     }
   }
 
-  /**
-   * Gère le succès d'un checkout
-   */
   async handleCheckoutSuccess({ request, response }: HttpContext) {
     try {
       const { session_id: sessionId } = request.qs()
@@ -63,9 +53,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Récupère les détails d'une session de checkout
-   */
   async getCheckoutSession({ params, response }: HttpContext) {
     try {
       const { sessionId } = params
@@ -97,9 +84,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Crée un portail client pour gérer les abonnements
-   */
   async createCustomerPortal({ response, auth }: HttpContext) {
     try {
       const utilisateur = auth.user as Utilisateurs
@@ -118,15 +102,11 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Télécharge une facture Stripe
-   */
   async downloadInvoice({ params, response, auth }: HttpContext) {
     try {
       const { invoiceId } = params
       const utilisateur = auth.user as Utilisateurs
 
-      // Vérifier que la facture appartient au client
       const invoice = await stripe.invoices.retrieve(invoiceId)
 
       if (!invoice.customer || invoice.customer !== utilisateur.stripeCustomerId) {
@@ -136,7 +116,6 @@ export default class StripeController {
         })
       }
 
-      // Récupérer l'URL de téléchargement
       const invoiceUrl = invoice.invoice_pdf
 
       if (!invoiceUrl) {
@@ -159,13 +138,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 🎯 GESTION DES PAIEMENTS
-   */
-
-  /**
-   * Crée un Payment Intent pour une livraison
-   */
   async createDeliveryPayment({ request, response, auth }: HttpContext) {
     try {
       const utilisateur = auth.user as Utilisateurs
@@ -196,9 +168,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Crée un Payment Intent pour un service
-   */
   async createServicePayment({ request, response, auth }: HttpContext) {
     try {
       const utilisateur = auth.user as Utilisateurs
@@ -229,9 +198,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 🚀 NOUVEAU: Crée un Payment Intent pour une livraison avec livraison_id
-   */
   async createLivraisonPayment({ request, response, auth }: HttpContext) {
     try {
       const {
@@ -251,7 +217,6 @@ export default class StripeController {
         return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
       }
 
-      // Vérifier que la livraison existe
       const LivraisonModel = await import('#models/livraison')
       const Livraison = LivraisonModel.default
       const livraison = await Livraison.find(livraisonId)
@@ -262,7 +227,6 @@ export default class StripeController {
         })
       }
 
-      // Vérifier que l'utilisateur est le client de la livraison
       if (livraison.clientId !== utilisateur.id) {
         return response.forbidden({
           success: false,
@@ -270,7 +234,6 @@ export default class StripeController {
         })
       }
 
-      // Vérifier que la livraison n'est pas déjà payée
       if (livraison.paymentStatus === 'paid') {
         return response.badRequest({
           success: false,
@@ -278,12 +241,10 @@ export default class StripeController {
         })
       }
 
-      // Vérifier si un Payment Intent existe déjà pour cette livraison et qu'il est encore valide
       if (livraison.paymentIntentId && livraison.paymentStatus === 'unpaid') {
         try {
           const existingPI = await stripe.paymentIntents.retrieve(livraison.paymentIntentId)
 
-          // Statuts où le client doit encore confirmer le paiement
           const reusableStatuses = [
             'requires_payment_method',
             'requires_confirmation',
@@ -309,10 +270,8 @@ export default class StripeController {
         }
       }
 
-      // Créer ou récupérer le client Stripe
       const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
 
-      // 🔒 ESCROW: Créer un nouveau Payment Intent avec capture manuelle
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Number(amount),
         currency: 'eur',
@@ -323,20 +282,17 @@ export default class StripeController {
           utilisateur_id: utilisateur.id.toString(),
           livraison_id: livraisonId.toString(),
         },
-        capture_method: 'manual', // ESCROW: L'argent est bloqué jusqu'à validation
+        capture_method: 'manual',
       })
-
-      // 🚀 Enregistrer le Payment Intent sans changer le statut de paiement pour l'instant
+      
       livraison.paymentIntentId = paymentIntent.id
-      livraison.amount = Number(amount) / 100 // Convertir centimes en euros
+      livraison.amount = Number(amount) / 100
       await livraison.save()
 
       console.log(
         `✅ Livraison ${livraisonId} mise à jour: payment_status=pending, payment_intent_id=${paymentIntent.id}`
       )
 
-      // 🔧 CORRECTION MAJEURE : NE PAS AJOUTER LES FONDS AU PORTEFEUILLE MAINTENANT
-      // Les fonds ne seront ajoutés qu'après validation du code selon le cahier des charges
       console.log(' ESCROW: Fonds bloqués chez Stripe, pas encore dans le portefeuille')
       console.log('🔒 Les fonds seront libérés après validation du code de livraison')
 
@@ -356,9 +312,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Capture et distribue un paiement après validation
-   */
   async capturePayment({ request, response, auth }: HttpContext) {
     try {
       const {
@@ -382,13 +335,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 🎯 INFORMATIONS PUBLIQUES
-   */
-
-  /**
-   * Récupère les informations de commission et plans
-   */
   async getCommissionInfo({ response }: HttpContext) {
     try {
       return response.ok({
@@ -409,7 +355,7 @@ export default class StripeController {
           },
           starter: {
             name: 'Starter',
-            price: 9.9,
+            price: 9.90,
             features: {
               max_packages_per_month: 50,
               insurance_coverage: 115,
@@ -421,7 +367,7 @@ export default class StripeController {
             name: 'Premium',
             price: 19.99,
             features: {
-              max_packages_per_month: -1, // Illimité
+              max_packages_per_month: -1,
               insurance_coverage: 3000,
               priority_support: true,
               discount: 9, // %
@@ -439,13 +385,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 🎯 WEBHOOKS STRIPE
-   */
-
-  /**
-   * 🔍 DEBUG: Liste toutes les factures Stripe pour vérification
-   */
   async debugListInvoices({ response, auth }: HttpContext) {
     try {
       const utilisateur = auth.user as Utilisateurs
@@ -458,7 +397,6 @@ export default class StripeController {
         })
       }
 
-      // Récupérer toutes les factures du client
       const invoices = await stripe.invoices.list({
         customer: utilisateur.stripeCustomerId,
         limit: 10,
@@ -491,9 +429,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * Endpoint pour recevoir les webhooks Stripe
-   */
   async webhook({ request, response }: HttpContext) {
     try {
       const signature = request.header('stripe-signature')
@@ -519,22 +454,14 @@ export default class StripeController {
     }
   }
 
-  // ===============================================
-  // 🆕 SYSTÈME PAIEMENT CLIENT MULTI-RÔLES
-  // ===============================================
-
-  /**
-   *  CRÉER PAIEMENT LIVRAISON AVEC OPTION CAGNOTTE
-   * Permet aux clients de choisir entre Stripe ou leur cagnotte
-   */
   async createLivraisonPaymentWithWallet({ request, response, auth }: HttpContext) {
     try {
       const {
         amount,
         livraison_id: livraisonId,
         description,
-        paymentMethod, // 'stripe' | 'wallet' | 'mixed'
-        walletAmount, // Montant à prendre sur la cagnotte (pour mixed)
+        paymentMethod,
+        walletAmount,
       } = request.only(['amount', 'livraison_id', 'description', 'paymentMethod', 'walletAmount'])
 
       console.log('🚀 CRÉATION PAIEMENT LIVRAISON AVEC CAGNOTTE:', {
@@ -549,7 +476,6 @@ export default class StripeController {
         return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
       }
 
-      // Vérifier que la livraison existe
       const LivraisonModel = await import('#models/livraison')
       const Livraison = LivraisonModel.default
       const livraison = await Livraison.find(livraisonId)
@@ -560,7 +486,6 @@ export default class StripeController {
         })
       }
 
-      // Vérifier que l'utilisateur est le client de la livraison
       if (livraison.clientId !== utilisateur.id) {
         return response.forbidden({
           success: false,
@@ -568,16 +493,14 @@ export default class StripeController {
         })
       }
 
-      const totalAmount = Number(amount) / 100 // Convertir en euros
-
-      // Cas 1: Paiement entièrement depuis la cagnotte
+      const totalAmount = Number(amount) / 100 
+      
       if (paymentMethod === 'wallet') {
         const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
         const PortefeuilleModel = PortefeuilleEcodeli.default
         const TransactionPortefeuille = await import('#models/transaction_portefeuille')
         const TransactionModel = TransactionPortefeuille.default
 
-        // Récupérer le portefeuille
         const portefeuille = await PortefeuilleModel.query()
           .where('utilisateur_id', utilisateur.id)
           .where('is_active', true)
@@ -590,7 +513,6 @@ export default class StripeController {
           })
         }
 
-        // Vérifier le solde disponible
         if (portefeuille.soldeDisponible < totalAmount) {
           return response.badRequest({
             success: false,
@@ -598,11 +520,9 @@ export default class StripeController {
           })
         }
 
-        // Débiter le portefeuille
         const ancienSolde = portefeuille.soldeDisponible
         await portefeuille.retirerFonds(totalAmount)
 
-        // Enregistrer la transaction
         await TransactionModel.create({
           portefeuilleId: portefeuille.id,
           utilisateurId: utilisateur.id,
@@ -620,7 +540,6 @@ export default class StripeController {
           }),
         })
 
-        // Mettre à jour la livraison
         livraison.paymentStatus = 'paid'
         livraison.amount = totalAmount
         await livraison.save()
@@ -636,7 +555,6 @@ export default class StripeController {
         })
       }
 
-      // Cas 2: Paiement mixte (cagnotte + Stripe)
       if (paymentMethod === 'mixed' && walletAmount) {
         const walletAmountEuros = Number(walletAmount) / 100
         const stripeAmountEuros = totalAmount - walletAmountEuros
@@ -648,7 +566,6 @@ export default class StripeController {
           })
         }
 
-        // Débiter la cagnotte d'abord (logique similaire au cas wallet)
         const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
         const PortefeuilleModel = PortefeuilleEcodeli.default
         const TransactionPortefeuille = await import('#models/transaction_portefeuille')
@@ -685,10 +602,9 @@ export default class StripeController {
           }),
         })
 
-        // Créer le Payment Intent Stripe pour le reste
         const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(stripeAmountEuros * 100), // Convertir en centimes
+          amount: Math.round(stripeAmountEuros * 100),
           currency: 'eur',
           customer: customerId,
           description: `${description} (partie Stripe)`,
@@ -713,7 +629,6 @@ export default class StripeController {
         })
       }
 
-      // Cas 3: Paiement entièrement par Stripe (méthode existante)
       const customerId = await StripeService.getOrCreateStripeCustomer(utilisateur)
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Number(amount),
@@ -750,10 +665,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 🔧 CRÉER PAIEMENT SERVICE AVEC OPTION CAGNOTTE
-   * Pour les services proposés par les prestataires clients
-   */
   async createServicePaymentWithWallet({ request, response, auth }: HttpContext) {
     try {
       const {
@@ -769,7 +680,6 @@ export default class StripeController {
         return response.unauthorized({ success: false, message: 'Utilisateur non authentifié' })
       }
 
-      // Vérifier que le service existe
       const ServiceModel = await import('#models/service')
       const Service = ServiceModel.default
       const service = await Service.find(serviceId)
@@ -782,7 +692,6 @@ export default class StripeController {
 
       const totalAmount = Number(amount) / 100
 
-      // Paiement depuis la cagnotte
       if (paymentMethod === 'wallet') {
         const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
         const PortefeuilleModel = PortefeuilleEcodeli.default
@@ -828,7 +737,6 @@ export default class StripeController {
           }),
         })
 
-        // Mettre à jour le service
         service.status = 'paid'
         await service.save()
 
@@ -843,7 +751,6 @@ export default class StripeController {
         })
       }
 
-      // Paiement Stripe standard
       const paymentIntent = await StripeService.createServicePayment(
         utilisateur,
         Number(amount),
@@ -867,10 +774,6 @@ export default class StripeController {
     }
   }
 
-  /**
-   * 📊 OBTENIR SOLDE CAGNOTTE CLIENT
-   * Pour afficher le solde disponible dans l'interface de paiement
-   */
   async getClientWalletBalance({ response, auth }: HttpContext) {
     try {
       const utilisateur = await auth.authenticate()

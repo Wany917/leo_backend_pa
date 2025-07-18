@@ -3,139 +3,78 @@ import Utilisateurs from '#models/utilisateurs'
 
 export default class extends BaseSeeder {
   async run() {
-    // Vérifier si des subscriptions existent déjà
-    const existingSubscriptions = await this.client.from('subscriptions').select('*').limit(1)
-    if (existingSubscriptions.length > 0) {
-      console.log('Des subscriptions existent déjà, seeder ignoré')
+    // Récupérer tous les utilisateurs
+    const allUsers = await Utilisateurs.all()
+    
+    if (allUsers.length === 0) {
+      console.log('❌ Aucun utilisateur trouvé dans la base de données')
       return
     }
 
-    // ✅ RÉCUPÉRER LES UTILISATEURS PAR EMAIL PLUTÔT QUE PAR ID FIXE
-    const marie = await Utilisateurs.findBy('email', 'marie.dupont@gmail.com')
-    const jean = await Utilisateurs.findBy('email', 'jean.martin@outlook.fr')
-    const ahmed = await Utilisateurs.findBy('email', 'ahmed.benali@gmail.com')
-    const sophie = await Utilisateurs.findBy('email', 'sophie.rousseau@laposte.net')
-    const isabelle = await Utilisateurs.findBy('email', 'isabelle.moreau@gmail.com')
-    const thomas = await Utilisateurs.findBy('email', 'thomas.petit@services.fr')
-    const francois = await Utilisateurs.findBy('email', 'contact@epiceriefine-paris.fr')
-    const nathalie = await Utilisateurs.findBy('email', 'contact@savons-paris.fr')
+    // Récupérer les utilisateurs qui ont déjà un abonnement
+    const existingSubscriptions = await this.client
+      .from('subscriptions')
+      .select('utilisateur_id')
+    
+    const usersWithSubscriptions = new Set(existingSubscriptions.map(sub => sub.utilisateur_id))
 
+    // Créer des abonnements pour les utilisateurs qui n'en ont pas
     const subscriptions = []
+    const currentDate = new Date()
 
-    if (marie) {
-      subscriptions.push({
-        utilisateur_id: marie.id,
-        subscription_type: 'free',
-        monthly_price: 0.0,
-        status: 'active',
-        start_date: new Date('2024-12-01'),
-        end_date: null, // Free n'expire jamais
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
+    // Définir des abonnements spéciaux pour certains utilisateurs (par email)
+    const specialSubscriptions = {
+      'jean.martin@outlook.fr': { type: 'starter', price: 9.9, endDate: new Date('2025-11-15') },
+      'ahmed.benali@gmail.com': { type: 'starter', price: 9.9, endDate: new Date('2025-10-01') },
+      'isabelle.moreau@gmail.com': { type: 'premium', price: 19.99, endDate: new Date('2025-09-01') },
+      'thomas.petit@services.fr': { type: 'starter', price: 9.9, endDate: new Date('2025-11-01') },
+      'contact@epiceriefine-paris.fr': { type: 'premium', price: 19.99, endDate: new Date('2025-08-01') },
+      'contact@savons-paris.fr': { type: 'premium', price: 19.99, endDate: new Date('2025-07-15') }
     }
 
-    if (jean) {
-      subscriptions.push({
-        utilisateur_id: jean.id, // Jean Martin - ID dynamique
-        subscription_type: 'starter',
-        monthly_price: 9.9,
-        status: 'active',
-        start_date: new Date('2024-11-15'),
-        end_date: new Date('2025-11-15'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
+    for (const user of allUsers) {
+      // Ignorer les utilisateurs qui ont déjà un abonnement
+      if (usersWithSubscriptions.has(user.id)) {
+        continue
+      }
 
-    // Livreurs avec abonnement Starter pour visibilité
-    if (ahmed) {
-      subscriptions.push({
-        utilisateur_id: ahmed.id, // Ahmed Benali - ID dynamique
-        subscription_type: 'starter',
-        monthly_price: 9.9,
-        status: 'active',
-        start_date: new Date('2024-10-01'),
-        end_date: new Date('2025-10-01'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    if (sophie) {
-      subscriptions.push({
-        utilisateur_id: sophie.id, // Sophie Rousseau - ID dynamique
-        subscription_type: 'free',
-        monthly_price: 0.0,
-        status: 'active',
-        start_date: new Date('2024-12-10'),
-        end_date: null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    // Prestataires avec Premium pour services avancés
-    if (isabelle) {
-      subscriptions.push({
-        utilisateur_id: isabelle.id, // Isabelle Moreau - ID dynamique
-        subscription_type: 'premium',
-        monthly_price: 19.99,
-        status: 'active',
-        start_date: new Date('2024-09-01'),
-        end_date: new Date('2025-09-01'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    if (thomas) {
-      subscriptions.push({
-        utilisateur_id: thomas.id, // Thomas Petit - ID dynamique
-        subscription_type: 'starter',
-        monthly_price: 9.9,
-        status: 'active',
-        start_date: new Date('2024-11-01'),
-        end_date: new Date('2025-11-01'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    // Commercants avec Premium pour business features
-    if (francois) {
-      subscriptions.push({
-        utilisateur_id: francois.id, // François Dubois - ID dynamique
-        subscription_type: 'premium',
-        monthly_price: 19.99,
-        status: 'active',
-        start_date: new Date('2024-08-01'),
-        end_date: new Date('2025-08-01'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-    }
-
-    if (nathalie) {
-      subscriptions.push({
-        utilisateur_id: nathalie.id, // Nathalie Sanchez - ID dynamique
-        subscription_type: 'premium',
-        monthly_price: 19.99,
-        status: 'active',
-        start_date: new Date('2024-07-15'),
-        end_date: new Date('2025-07-15'),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
+      // Vérifier s'il y a un abonnement spécial pour cet utilisateur
+      const specialSub = specialSubscriptions[user.email as keyof typeof specialSubscriptions]
+      
+      if (specialSub) {
+        subscriptions.push({
+          utilisateur_id: user.id,
+          subscription_type: specialSub.type,
+          monthly_price: specialSub.price,
+          status: 'active',
+          start_date: currentDate,
+          end_date: specialSub.endDate,
+          created_at: currentDate,
+          updated_at: currentDate,
+        })
+      } else {
+        // Abonnement gratuit par défaut pour tous les autres utilisateurs
+        subscriptions.push({
+          utilisateur_id: user.id,
+          subscription_type: 'free',
+          monthly_price: 0.0,
+          status: 'active',
+          start_date: currentDate,
+          end_date: null, // Free n'expire jamais
+          created_at: currentDate,
+          updated_at: currentDate,
+        })
+      }
     }
 
     if (subscriptions.length > 0) {
       await this.client.table('subscriptions').insert(subscriptions)
       console.log(
-        `✅ ${subscriptions.length} subscriptions créées avec succès avec auto-incrémentation`
+        `✅ ${subscriptions.length} abonnements créés avec succès pour tous les utilisateurs`
       )
+      console.log(`📊 Total utilisateurs: ${allUsers.length}, Nouveaux abonnements: ${subscriptions.length}, Abonnements existants: ${usersWithSubscriptions.size}`)
     } else {
-      console.log('❌ Aucun utilisateur trouvé pour créer des subscriptions')
+      console.log('ℹ️ Tous les utilisateurs ont déjà un abonnement')
     }
   }
 }

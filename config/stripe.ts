@@ -34,7 +34,7 @@ export const SUBSCRIPTION_PLANS = {
     id: 'starter',
     name: 'Starter',
     price: 9.9,
-    stripePriceId: process.env.STRIPE_PRICE_STARTER_MONTHLY || 'price_starter_monthly',
+    stripePriceId: process.env.STRIPE_PRICE_STARTER_MONTHLY || null, // Doit être configuré dans .env
     features: {
       assurance: 115, // €
       reduction: 5, // %
@@ -45,7 +45,7 @@ export const SUBSCRIPTION_PLANS = {
     id: 'premium',
     name: 'Premium',
     price: 19.99,
-    stripePriceId: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || 'price_premium_monthly',
+    stripePriceId: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || null, // Doit être configuré dans .env
     features: {
       assurance: 3000, // €
       reduction: 9, // %
