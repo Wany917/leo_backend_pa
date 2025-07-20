@@ -3,10 +3,12 @@
 ## Modifications apportées
 
 ### 1. Modèle Booking
+
 - ✅ Ajout du champ `address` (string)
 - ✅ Suppression de la logique complexe de créneaux
 
 ### 2. Contrôleur BookingsController
+
 - ✅ Simplification de la méthode `create`:
   - Récupération automatique du client via `auth.user`
   - Champs requis: `service_id`, `booking_datetime`, `address`
@@ -15,12 +17,14 @@
   - Ajout des informations client dans la réponse
 
 ### 3. Validateur
+
 - ✅ Mise à jour de `createBookingValidator`:
   - Suppression de `client_id`, `start_datetime`, `end_datetime`
   - Ajout de `booking_datetime` et `address`
   - Validation de l'adresse (5-255 caractères)
 
 ### 4. Migration
+
 - ✅ Création de la migration pour ajouter le champ `address`
 
 ## API simplifiée
@@ -28,12 +32,14 @@
 ### Endpoint: POST /bookings
 
 **Headers:**
+
 ```
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
 **Body:**
+
 ```json
 {
   "service_id": 1,
@@ -44,6 +50,7 @@ Content-Type: application/json
 ```
 
 **Réponse:**
+
 ```json
 {
   "message": "Réservation créée avec succès",

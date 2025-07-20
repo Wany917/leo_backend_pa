@@ -87,15 +87,6 @@ export default class ServicesController {
         }
       })
 
-      console.log(
-        'Backend services_controller.ts - Raw services from DB:',
-        services.map((s) => ({ id: s.id, prestataireId: s.prestataireId, name: s.name }))
-      )
-      console.log(
-        'Backend services_controller.ts - Mapped services:',
-        mappedServices.map((s) => ({ id: s.id, prestataireId: s.prestataireId, name: s.name }))
-      )
-
       return response.ok(mappedServices)
     } catch (error) {
       console.error('Services index error:', error)
@@ -373,16 +364,6 @@ export default class ServicesController {
         .preload('prestataire')
         .orderBy('price', 'asc')
         .paginate(page, limit)
-
-      console.log(
-        'Backend services_controller.ts - Services query result:',
-        services.all().map((s) => ({
-          id: s.id,
-          prestataireId: s.prestataireId,
-          name: s.name,
-          serialized: s.serialize(),
-        }))
-      )
 
       const prestataireIds = services.map((s) => s.prestataire?.id).filter(Boolean) as number[]
       const users = await Utilisateurs.query().whereIn('id', prestataireIds)
