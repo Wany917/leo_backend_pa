@@ -36,25 +36,13 @@ export default class BookingsController {
 
   async create({ request, response, auth }: HttpContext) {
     try {
-      const payload = await request.validateUsing(createBookingValidator)
-      const { service_id, start_datetime, end_datetime, address, notes } = payload
+      const { client_id, service_id, start_datetime, end_datetime, address, notes } = await request.validateUsing(createBookingValidator)
+      console.log("Address : ", address)
 
-      // Récupération automatique du client depuis l'authentification
       const user = auth.user
       if (!user) {
         return response.status(401).send({
           error_message: 'Utilisateur non authentifié',
-        })
-      }
-
-      // Vérifier et créer un client si nécessaire
-      const Client = (await import('#models/client')).default
-      let client = await Client.find(user.id)
-      if (!client) {
-        client = await Client.create({
-          id: user.id,
-          loyalty_points: 0,
-          preferred_payment_method: null,
         })
       }
 
@@ -93,7 +81,7 @@ export default class BookingsController {
       }
 
       const booking = await Booking.create({
-        clientId: client.id,
+        clientId: client_id,
         serviceId: service_id,
         startDatetime: startDateTime,
         endDatetime: endDateTime,
