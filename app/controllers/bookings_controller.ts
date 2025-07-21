@@ -40,10 +40,21 @@ export default class BookingsController {
       const { service_id, start_datetime, end_datetime, address, notes } = payload
 
       // Récupération automatique du client depuis l'authentification
-      const client = auth.user
-      if (!client) {
+      const user = auth.user
+      if (!user) {
         return response.status(401).send({
           error_message: 'Utilisateur non authentifié',
+        })
+      }
+
+      // Vérifier et créer un client si nécessaire
+      const Client = (await import('#models/client')).default
+      let client = await Client.find(user.id)
+      if (!client) {
+        client = await Client.create({
+          id: user.id,
+          loyalty_points: 0,
+          preferred_payment_method: null,
         })
       }
 
@@ -97,7 +108,7 @@ export default class BookingsController {
         booking: {
           id: booking.id,
           service_name: service.name,
-          client_name: `${client.first_name} ${client.last_name}`,
+          client_name: `${user.first_name} ${user.last_name}`,
           booking_datetime: booking.startDatetime.toISO(),
           end_datetime: booking.endDatetime.toISO(),
           address: booking.address,
@@ -242,11 +253,16 @@ export default class BookingsController {
       const user = auth.user!
       const status = request.input('status')
 
-      const client = await db.from('clients').where('id', user.id).first()
+      let client = await db.from('clients').where('id', user.id).first()
       if (!client) {
-        return response.status(404).send({
-          error_message: 'Client non trouvé pour cet utilisateur',
+        // Créer automatiquement un client si celui-ci n'existe pas
+        const Client = (await import('#models/client')).default
+        await Client.create({
+          id: user.id,
+          loyalty_points: 0,
+          preferred_payment_method: null,
         })
+        client = { id: user.id }
       }
 
       let query = db

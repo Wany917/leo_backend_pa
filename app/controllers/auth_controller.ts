@@ -6,6 +6,7 @@ import Subscription from '#models/subscription'
 import AccessToken from '#models/access_token'
 import StripeService from '#services/stripe_service'
 import { DateTime } from 'luxon'
+import Client from '#models/client'
 
 export default class AuthController {
   async login({ request, response }: HttpContext) {
@@ -42,8 +43,6 @@ export default class AuthController {
     try {
       const payload = await request.validateUsing(registerValidator)
 
-
-
       const existingUtilisateurs = await Utilisateurs.findBy('email', payload.email)
       if (existingUtilisateurs) {
         if (existingUtilisateurs.state === 'closed') {
@@ -79,8 +78,12 @@ export default class AuthController {
         country: payload.country,
       })
 
-
-
+      // Créer automatiquement un client pour chaque nouvel utilisateur
+      await Client.create({
+        id: user.id,
+        loyalty_points: 0,
+        preferred_payment_method: null,
+      })
 
       await StripeService.createFreeSubscription(user.id)
 
