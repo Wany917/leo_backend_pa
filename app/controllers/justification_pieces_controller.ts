@@ -241,12 +241,20 @@ export default class JustificationPiecesController {
 
   async verify({ request, response }: HttpContext) {
     try {
+      console.log('🔍 [VALIDATION] Début de la validation de la pièce justificative ID:', request.param('id'))
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
+      console.log('📄 [VALIDATION] Pièce justificative trouvée:', {
+        id: justificationPiece.id,
+        utilisateur_id: justificationPiece.utilisateur_id,
+        document_type: justificationPiece.document_type,
+        account_type: justificationPiece.account_type,
+        verification_status: justificationPiece.verification_status
+      })
 
       const userId = justificationPiece.utilisateur_id
       const accountType = justificationPiece.account_type
 
-
+      console.log('👤 [VALIDATION] Vérification du rôle existant pour utilisateur ID:', userId, 'type:', accountType)
 
       let roleAlreadyExists = false
       try {
@@ -254,31 +262,48 @@ export default class JustificationPiecesController {
           case 'livreur':
             const existingLivreur = await Livreur.find(userId)
             roleAlreadyExists = !!existingLivreur
+            console.log('🚚 [VALIDATION] Rôle livreur existant:', roleAlreadyExists)
             break
           case 'prestataire':
             const existingPrestataire = await Prestataire.find(userId)
             roleAlreadyExists = !!existingPrestataire
+            console.log('🔧 [VALIDATION] Rôle prestataire existant:', roleAlreadyExists)
             break
           case 'commercant':
             const existingCommercant = await Commercant.find(userId)
             roleAlreadyExists = !!existingCommercant
+            console.log('🏪 [VALIDATION] Rôle commerçant existant:', roleAlreadyExists)
             break
         }
       } catch (roleCheckError) {
+        console.error('❌ [VALIDATION] Erreur lors de la vérification du rôle:', roleCheckError)
       }
 
       if (roleAlreadyExists) {
+        console.log('✅ [AUTO-VALIDATION] Rôle existant détecté - Auto-validation de tous les documents en attente')
         const pendingDocuments = await JustificationPiece.query()
           .where('utilisateur_id', userId)
           .where('account_type', accountType)
           .where('verification_status', 'pending')
+        
+        console.log('📋 [AUTO-VALIDATION] Documents en attente trouvés:', pendingDocuments.length)
+        pendingDocuments.forEach(doc => {
+          console.log('📄 [AUTO-VALIDATION] Document à valider:', {
+            id: doc.id,
+            document_type: doc.document_type,
+            file_path: doc.file_path
+          })
+        })
 
         for (const doc of pendingDocuments) {
+          console.log('✅ [AUTO-VALIDATION] Validation du document ID:', doc.id)
           doc.verification_status = 'verified'
           doc.verified_at = DateTime.now()
           await doc.save()
+          console.log('💾 [AUTO-VALIDATION] Document sauvegardé avec statut verified')
         }
 
+        console.log('🎉 [AUTO-VALIDATION] Auto-validation terminée -', pendingDocuments.length, 'documents validés')
         return response.ok({
           status: 'success',
           message: `All ${pendingDocuments.length} pending documents auto-validated (role already exists)`,
@@ -290,56 +315,61 @@ export default class JustificationPiecesController {
       }
 
 
+      console.log('📝 [VALIDATION] Validation du document unique - Pas de rôle existant')
       justificationPiece.verification_status = 'verified'
       justificationPiece.verified_at = DateTime.now()
       await justificationPiece.save()
+      console.log('💾 [VALIDATION] Document sauvegardé avec statut verified')
 
-
+      console.log('🆕 [CRÉATION RÔLE] Création du nouveau rôle:', accountType, 'pour utilisateur ID:', userId)
 
       try {
         switch (accountType) {
           case 'livreur':
+            console.log('🚚 [CRÉATION RÔLE] Création du rôle livreur...')
             await Livreur.create({
               id: userId,
-              availabilityStatus: 'available',
-              rating: null,
             })
-
+            console.log('✅ [CRÉATION RÔLE] Rôle livreur créé avec succès')
             break
 
           case 'prestataire':
+            console.log('🔧 [CRÉATION RÔLE] Création du rôle prestataire...')
             await Prestataire.create({
               id: userId,
               service_type: null,
               rating: null,
             })
-
+            console.log('✅ [CRÉATION RÔLE] Rôle prestataire créé avec succès')
             break
 
           case 'commercant':
+            console.log('🏪 [CRÉATION RÔLE] Création du rôle commerçant...')
             await Commercant.create({
               id: userId,
               storeName: 'Nom du magasin à définir',
               businessAddress: null,
               contactNumber: null,
-              contractStartDate: DateTime.now(),
-              contractEndDate: DateTime.now().plus({ years: 1 }),
               verificationState: 'verified',
             })
-
+            console.log('✅ [CRÉATION RÔLE] Rôle commerçant créé avec succès')
             break
 
           default:
+            console.log('⚠️ [CRÉATION RÔLE] Type de compte non reconnu:', accountType)
         }
       } catch (roleError) {
+        console.error('❌ [CRÉATION RÔLE] Erreur lors de la création du rôle:', roleError)
       }
 
+      console.log('🎉 [VALIDATION] Validation terminée avec succès - Rôle créé')
       return response.ok({
         status: 'success',
         message: 'Justification piece verified successfully and role created',
         data: justificationPiece.serialize(),
       })
     } catch (error) {
+      console.error('❌ [VALIDATION] Erreur lors de la validation:', error)
       return response.notFound({
         status: 'error',
         message: 'Justification piece not found',
