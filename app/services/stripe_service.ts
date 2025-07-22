@@ -61,7 +61,9 @@ export default class StripeService {
     }
 
     if (!plan.stripePriceId) {
-      throw new Error(`Configuration Stripe manquante: STRIPE_PRICE_${planType.toUpperCase()}_MONTHLY doit être défini dans les variables d'environnement`)
+      throw new Error(
+        `Configuration Stripe manquante: STRIPE_PRICE_${planType.toUpperCase()}_MONTHLY doit être défini dans les variables d'environnement`
+      )
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -370,16 +372,34 @@ export default class StripeService {
     metadata: any
   }> {
     try {
+      console.log('🔍 DEBUG BACKEND - checkPaymentEscrowStatus - DÉBUT');
+      console.log('🔍 DEBUG BACKEND - paymentIntentId:', paymentIntentId);
+      
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
-
-      return {
+      
+      console.log('🔍 DEBUG BACKEND - PaymentIntent récupéré:');
+      console.log('🔍 DEBUG BACKEND - - ID:', paymentIntent.id);
+      console.log('🔍 DEBUG BACKEND - - Status:', paymentIntent.status);
+      console.log('🔍 DEBUG BACKEND - - Amount (centimes):', paymentIntent.amount);
+      console.log('🔍 DEBUG BACKEND - - Amount (euros):', paymentIntent.amount / 100);
+      console.log('🔍 DEBUG BACKEND - - Currency:', paymentIntent.currency);
+      console.log('🔍 DEBUG BACKEND - - Metadata:', paymentIntent.metadata);
+      console.log('🔍 DEBUG BACKEND - - Created:', new Date(paymentIntent.created * 1000).toISOString());
+      
+      const result = {
         isInEscrow: paymentIntent.status === 'requires_capture',
         amount: paymentIntent.amount / 100, // Convertir en euros
         status: paymentIntent.status,
         metadata: paymentIntent.metadata,
-      }
+      };
+      
+      console.log('🔍 DEBUG BACKEND - Résultat checkPaymentEscrowStatus:', result);
+      console.log('✅ DEBUG BACKEND - checkPaymentEscrowStatus - FIN');
+
+      return result;
     } catch (error) {
-      console.error('❌ Erreur vérification escrow:', error)
+      console.error('❌ DEBUG BACKEND - Erreur vérification escrow:', error)
+      console.error('❌ DEBUG BACKEND - PaymentIntent ID en erreur:', paymentIntentId)
       throw error
     }
   }

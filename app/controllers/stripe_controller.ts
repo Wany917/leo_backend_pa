@@ -284,7 +284,7 @@ export default class StripeController {
         },
         capture_method: 'manual',
       })
-      
+
       livraison.paymentIntentId = paymentIntent.id
       livraison.amount = Number(amount) / 100
       await livraison.save()
@@ -355,7 +355,7 @@ export default class StripeController {
           },
           starter: {
             name: 'Starter',
-            price: 9.90,
+            price: 9.9,
             features: {
               max_packages_per_month: 50,
               insurance_coverage: 115,
@@ -493,8 +493,8 @@ export default class StripeController {
         })
       }
 
-      const totalAmount = Number(amount) / 100 
-      
+      const totalAmount = Number(amount) / 100
+
       if (paymentMethod === 'wallet') {
         const PortefeuilleEcodeli = await import('#models/portefeuille_ecodeli')
         const PortefeuilleModel = PortefeuilleEcodeli.default
