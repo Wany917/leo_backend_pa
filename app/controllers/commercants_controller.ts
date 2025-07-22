@@ -6,24 +6,14 @@ import { DateTime } from 'luxon'
 
 export default class CommercantsController {
   async add({ request, response }: HttpContext) {
-
-
     try {
-
-      const {
-        utilisateur_id,
-        store_name,
-        business_address,
-      } = await request.validateUsing(commercantValidator)
-
-
+      const { utilisateur_id, store_name, business_address } =
+        await request.validateUsing(commercantValidator)
 
       const commercantAlreadyLinked = await Commercant.find(utilisateur_id)
       if (commercantAlreadyLinked) {
-
         return response.badRequest({ message: 'Utilisateur already has a Commercant account' })
       }
-
 
       const commercant = await Commercant.create({
         id: utilisateur_id,
@@ -32,13 +22,11 @@ export default class CommercantsController {
         verificationState: 'pending',
       })
 
-
       return response.created({
         message: 'Commercant created successfully',
         commercant: commercant.serialize(),
       })
     } catch (error) {
-
       return response.badRequest({ message: 'Invalid data', error_code: error })
     }
   }
@@ -47,7 +35,7 @@ export default class CommercantsController {
     try {
       const commercant = await Commercant.findOrFail(request.param('id'))
       const user = await Utilisateurs.findOrFail(request.param('id'))
-      const { password, ...userData } = user.serialize()
+      const userData = user.serialize()
       const { id, ...commercantData } = commercant.serialize()
       return response.ok({ user: userData, commercant: commercantData })
     } catch (error) {
@@ -97,18 +85,76 @@ export default class CommercantsController {
 
   async getUnverified({ response }: HttpContext) {
     try {
-      const commercants = await Commercant.query().where('verification_state', 'pending')
-      return response.ok({ commercants: commercants.map((commercant) => commercant.serialize()) })
+      const commercants = await Commercant.query()
+        .where('verification_state', 'pending')
+        .preload('user')
+
+      console.log('🏪 [BACKEND] Commerçants trouvés:', commercants.length)
+      if (commercants.length > 0) {
+        console.log('🔍 [BACKEND] Premier commerçant brut:', {
+          id: commercants[0].id,
+          storeName: commercants[0].storeName,
+          user: commercants[0].user,
+          user_loaded: !!commercants[0].user,
+        })
+
+        const serialized = commercants.map((commercant) => {
+          const commercantData = commercant.serialize()
+
+          // Ajouter manuellement first_name et last_name si l'utilisateur existe
+          if (commercantData.user) {
+            commercantData.user.first_name = commercantData.user.firstName
+            commercantData.user.last_name = commercantData.user.lastName
+          }
+
+          return commercantData
+        })
+        console.log('📦 [BACKEND] Premier commerçant sérialisé:', serialized[0])
+
+        return response.ok({ commercants: serialized })
+      }
+
+      return response.ok({ commercants: [] })
     } catch (error) {
+      console.error('❌ [BACKEND] Erreur getUnverified:', error)
       return response.badRequest({ message: 'Error fetching unverified commercants', error: error })
     }
   }
 
   async getVerified({ response }: HttpContext) {
     try {
-      const commercants = await Commercant.query().where('verification_state', 'verified')
-      return response.ok({ commercants: commercants.map((commercant) => commercant.serialize()) })
+      const commercants = await Commercant.query()
+        .where('verification_state', 'verified')
+        .preload('user')
+
+      console.log('🏪 [BACKEND] Commerçants vérifiés trouvés:', commercants.length)
+      if (commercants.length > 0) {
+        console.log('🔍 [BACKEND] Premier commerçant vérifié brut:', {
+          id: commercants[0].id,
+          storeName: commercants[0].storeName,
+          user: commercants[0].user,
+          user_loaded: !!commercants[0].user,
+        })
+
+        const serialized = commercants.map((commercant) => {
+          const commercantData = commercant.serialize()
+
+          // Ajouter manuellement first_name et last_name si l'utilisateur existe
+          if (commercantData.user) {
+            commercantData.user.first_name = commercantData.user.firstName
+            commercantData.user.last_name = commercantData.user.lastName
+          }
+
+          return commercantData
+        })
+        console.log('📦 [BACKEND] Premier commerçant vérifié sérialisé:', serialized[0])
+
+        return response.ok({ commercants: serialized })
+      }
+
+      return response.ok({ commercants: [] })
     } catch (error) {
+      console.error('❌ [BACKEND] Erreur getVerified:', error)
       return response.badRequest({ message: 'Error fetching verified commercants', error: error })
     }
   }

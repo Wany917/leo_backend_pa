@@ -10,10 +10,8 @@ import fs from 'node:fs/promises'
 import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class JustificationPiecesController {
-
   async create({ request, response }: HttpContext) {
     try {
-
       const file = request.file('file', {
         size: '10mb',
         extnames: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
@@ -25,7 +23,6 @@ export default class JustificationPiecesController {
           message: 'No file provided',
         })
       }
-
 
       const utilisateur_id = request.input('utilisateur_id')
       const document_type = request.input('document_type')
@@ -241,20 +238,28 @@ export default class JustificationPiecesController {
 
   async verify({ request, response }: HttpContext) {
     try {
-      console.log('🔍 [VALIDATION] Début de la validation de la pièce justificative ID:', request.param('id'))
+      console.log(
+        '🔍 [VALIDATION] Début de la validation de la pièce justificative ID:',
+        request.param('id')
+      )
       const justificationPiece = await JustificationPiece.findOrFail(request.param('id'))
       console.log('📄 [VALIDATION] Pièce justificative trouvée:', {
         id: justificationPiece.id,
         utilisateur_id: justificationPiece.utilisateur_id,
         document_type: justificationPiece.document_type,
         account_type: justificationPiece.account_type,
-        verification_status: justificationPiece.verification_status
+        verification_status: justificationPiece.verification_status,
       })
 
       const userId = justificationPiece.utilisateur_id
       const accountType = justificationPiece.account_type
 
-      console.log('👤 [VALIDATION] Vérification du rôle existant pour utilisateur ID:', userId, 'type:', accountType)
+      console.log(
+        '👤 [VALIDATION] Vérification du rôle existant pour utilisateur ID:',
+        userId,
+        'type:',
+        accountType
+      )
 
       let roleAlreadyExists = false
       try {
@@ -280,18 +285,20 @@ export default class JustificationPiecesController {
       }
 
       if (roleAlreadyExists) {
-        console.log('✅ [AUTO-VALIDATION] Rôle existant détecté - Auto-validation de tous les documents en attente')
+        console.log(
+          '✅ [AUTO-VALIDATION] Rôle existant détecté - Auto-validation de tous les documents en attente'
+        )
         const pendingDocuments = await JustificationPiece.query()
           .where('utilisateur_id', userId)
           .where('account_type', accountType)
           .where('verification_status', 'pending')
-        
+
         console.log('📋 [AUTO-VALIDATION] Documents en attente trouvés:', pendingDocuments.length)
-        pendingDocuments.forEach(doc => {
+        pendingDocuments.forEach((doc) => {
           console.log('📄 [AUTO-VALIDATION] Document à valider:', {
             id: doc.id,
             document_type: doc.document_type,
-            file_path: doc.file_path
+            file_path: doc.file_path,
           })
         })
 
@@ -303,7 +310,11 @@ export default class JustificationPiecesController {
           console.log('💾 [AUTO-VALIDATION] Document sauvegardé avec statut verified')
         }
 
-        console.log('🎉 [AUTO-VALIDATION] Auto-validation terminée -', pendingDocuments.length, 'documents validés')
+        console.log(
+          '🎉 [AUTO-VALIDATION] Auto-validation terminée -',
+          pendingDocuments.length,
+          'documents validés'
+        )
         return response.ok({
           status: 'success',
           message: `All ${pendingDocuments.length} pending documents auto-validated (role already exists)`,
@@ -314,14 +325,18 @@ export default class JustificationPiecesController {
         })
       }
 
-
       console.log('📝 [VALIDATION] Validation du document unique - Pas de rôle existant')
       justificationPiece.verification_status = 'verified'
       justificationPiece.verified_at = DateTime.now()
       await justificationPiece.save()
       console.log('💾 [VALIDATION] Document sauvegardé avec statut verified')
 
-      console.log('🆕 [CRÉATION RÔLE] Création du nouveau rôle:', accountType, 'pour utilisateur ID:', userId)
+      console.log(
+        '🆕 [CRÉATION RÔLE] Création du nouveau rôle:',
+        accountType,
+        'pour utilisateur ID:',
+        userId
+      )
 
       try {
         switch (accountType) {
@@ -404,17 +419,14 @@ export default class JustificationPiecesController {
     }
   }
 
-
   async delete({ params, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
 
-
       try {
         await fs.unlink(filePath)
-      } catch (error) {
-      }
+      } catch (error) {}
       await justificationPiece.delete()
 
       return response.ok({
@@ -430,12 +442,10 @@ export default class JustificationPiecesController {
     }
   }
 
-
   async downloadById({ params, response }: HttpContext) {
     try {
       const justificationPiece = await JustificationPiece.findOrFail(params.id)
       const filePath = app.makePath('tmp/uploads/justifications', justificationPiece.file_path)
-
 
       try {
         await fs.access(filePath)

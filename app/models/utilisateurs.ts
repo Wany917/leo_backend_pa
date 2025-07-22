@@ -108,4 +108,26 @@ export default class Utilisateurs extends compose(BaseModel, AuthFinder) {
   declare subscription: HasOne<typeof Subscription>
 
   static accessTokens = DbAccessTokensProvider.forModel(Utilisateurs)
+
+  // Méthode de sérialisation personnalisée pour exposer les propriétés utilisateur
+  serialize() {
+    const serialized = super.serialize()
+
+    console.log('🔧 [UTILISATEURS] Sérialisation utilisateur:', {
+      firstName: serialized.firstName,
+      lastName: serialized.lastName,
+      raw_first_name: this.first_name,
+      raw_last_name: this.last_name,
+    })
+
+    // S'assurer que first_name et last_name sont inclus en plus des versions camelCase
+    const result = {
+      ...serialized,
+      first_name: serialized.firstName,
+      last_name: serialized.lastName,
+    }
+
+    console.log('🔧 [UTILISATEURS] Résultat sérialisation:', result)
+    return result
+  }
 }
