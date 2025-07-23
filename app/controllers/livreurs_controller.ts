@@ -3,7 +3,9 @@ import Livreur from '#models/livreur'
 import Utilisateurs from '#models/utilisateurs'
 import Livraison from '#models/livraison'
 import HistoriqueLivraison from '#models/historique_livraison'
+import CodeTemporaire from '#models/code_temporaire'
 import { livreurValidator } from '#validators/add_livreur'
+import { Resend } from 'resend'
 // import { DateTime } from 'luxon'
 
 export default class LivreursController {
@@ -33,7 +35,7 @@ export default class LivreursController {
     try {
       const client = await Livreur.findOrFail(request.param('id'))
       const user = await Utilisateurs.findOrFail(request.param('id'))
-      const { password, ...userData } = user.serialize()
+      const userData = user.serialize()
       const { id, ...clientData } = client.serialize()
       return response.ok({ user: userData, client: clientData })
     } catch (error) {
@@ -217,13 +219,64 @@ export default class LivreursController {
         remarks: remarks || `Statut changé de ${oldStatus} à ${status}`,
       })
 
-      // Si la livraison est terminée, mettre à jour les colis
+      // Si la livraison est terminée, mettre à jour les colis et l'annonce
       if (status === 'completed') {
         await livraison.load('colis')
         for (const coli of livraison.colis) {
           coli.status = 'delivered'
           coli.locationType = 'client_address'
           await coli.save()
+        }
+
+        // Mettre à jour le statut de l'annonce si elle existe
+        if (livraison.annonceId) {
+          await livraison.load('annonce')
+          if (livraison.annonce) {
+            livraison.annonce.status = 'completed'
+            await livraison.annonce.save()
+          }
+        }
+
+        // Générer et envoyer le code de validation par email au client
+        await livraison.load('client')
+        if (livraison.client) {
+          await livraison.client.load('user')
+          const clientEmail = livraison.client.user.email
+          
+          // Supprimer l'ancien code s'il existe
+          await CodeTemporaire.query().where('user_info', livraison.id.toString()).delete()
+          
+          // Générer un nouveau code
+          const code = Math.floor(100000 + Math.random() * 900000).toString()
+          
+          // Sauvegarder le code en base
+          await CodeTemporaire.create({
+            user_info: livraison.id.toString(),
+            code: code
+          })
+          
+          // Envoyer l'email avec le code
+          try {
+            const resend = new Resend(process.env.RESEND_API_KEY!)
+            await resend.emails.send({
+              from: process.env.RESEND_FROM_EMAIL || "noreplyecodeli@gmail.com",
+              to: clientEmail,
+              subject: "Code de validation de livraison - EcoDeli",
+              html: `
+                <h2>Votre livraison a été effectuée !</h2>
+                <p>Bonjour,</p>
+                <p>Votre livraison #${livraison.id} a été marquée comme effectuée par le livreur.</p>
+                <p>Voici votre code de validation :</p>
+                <h3 style="background-color: #f0f0f0; padding: 10px; text-align: center; font-size: 24px; letter-spacing: 3px;">${code}</h3>
+                <p>Utilisez ce code pour confirmer la réception de votre livraison.</p>
+                <p>Merci d'avoir utilisé EcoDeli !</p>
+              `
+            })
+            console.log(`Code de validation envoyé à ${clientEmail} pour la livraison ${livraison.id}`)
+          } catch (emailError) {
+            console.error('Erreur lors de l\'envoi de l\'email:', emailError)
+            // Ne pas faire échouer la mise à jour du statut si l'email échoue
+          }
         }
       }
 

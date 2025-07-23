@@ -105,7 +105,18 @@ export default class LivraisonsController {
     const livraison = await Livraison.query()
       .where('id', id)
       .preload('livreur')
-      .preload('colis')
+      .preload('annonce', (annonceQuery) => {
+        annonceQuery.preload('utilisateur' as any)
+      })
+      .preload('client', (clientQuery) => {
+        clientQuery.preload('user' as any)
+      })
+      .preload('colis', (colisQuery) => {
+        colisQuery.preload('annonce', (annonceQuery) => {
+          annonceQuery.preload('utilisateur' as any)
+        })
+      })
+      .preload('historique')
       .firstOrFail()
     return response.ok({ livraison: livraison.serialize() })
   }
