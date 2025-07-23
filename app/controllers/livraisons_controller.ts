@@ -91,7 +91,7 @@ export default class LivraisonsController {
       console.error('Erreur création livraison:', error)
       return response.badRequest({
         message: 'Erreur lors de la création de la livraison',
-        error: error,
+        error: error.message,
       })
     }
   }

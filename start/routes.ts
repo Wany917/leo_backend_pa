@@ -119,6 +119,12 @@ router
       .post(':id/livraisons/:livraisonId/accept', [LivreurController, 'acceptLivraison'])
       .use(middleware.auth())
     router
+      .post(':id/livraisons/:livraisonId/confirm-pickup', [LivreurController, 'confirmPickup'])
+      .use(middleware.auth())
+    router
+      .post(':id/livraisons/:livraisonId/confirm-en-route', [LivreurController, 'confirmEnRoute'])
+      .use(middleware.auth())
+    router
       .put(':id/livraisons/:livraisonId/status', [LivreurController, 'updateLivraisonStatus'])
       .use(middleware.auth())
     router.get(':id/stats', [LivreurController, 'getStats']).use(middleware.auth())

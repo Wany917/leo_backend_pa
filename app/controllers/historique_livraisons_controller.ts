@@ -1,2 +1,1 @@
-export default class HistoriqueLivraisonsController {
-}
+export default class HistoriqueLivraisonsController {}

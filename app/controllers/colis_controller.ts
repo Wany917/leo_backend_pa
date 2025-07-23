@@ -8,7 +8,6 @@ import { DateTime } from 'luxon'
 import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ColisController {
-
   async getAllColis({ request, response }: HttpContext) {
     try {
       const page = request.input('page', 1)
@@ -20,11 +19,9 @@ export default class ColisController {
         annonceQuery.preload('utilisateur' as ExtractModelRelations<Annonce>)
       })
 
-
       if (status) {
         query = query.where('status', status)
       }
-
 
       if (search) {
         query = query.where((builder) => {
@@ -40,7 +37,6 @@ export default class ColisController {
         colis: colis.serialize(),
       })
     } catch (error) {
-
       return response.status(500).json({
         error: 'Une erreur est survenue lors de la récupération des colis',
         details: error.message,
@@ -80,7 +76,6 @@ export default class ColisController {
       currentAddress: annonce.utilisateur.address,
     })
 
-
     await ColisLocationHistory.create({
       colisId: colis.id,
       locationType: 'client_address',
@@ -91,7 +86,6 @@ export default class ColisController {
     })
 
     await colis.load('annonce')
-
 
     return response.created({
       colis: colis.serialize(),
@@ -108,7 +102,6 @@ export default class ColisController {
       .preload('livraisons')
       .preload('stockage')
       .firstOrFail()
-
 
     const locationHistory = await ColisLocationHistory.query()
       .where('colis_id', colis.id)
@@ -144,7 +137,6 @@ export default class ColisController {
 
     const colis = await Colis.findByOrFail('tracking_number', trackingNumber)
 
-
     colis.locationType = locationType
     colis.locationId = locationId
 
@@ -153,7 +145,6 @@ export default class ColisController {
     }
 
     await colis.save()
-
 
     await ColisLocationHistory.create({
       colisId: colis.id,

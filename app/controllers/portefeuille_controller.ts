@@ -11,44 +11,29 @@ export default class PortefeuilleController {
    */
   public async show({ params, response, auth }: HttpContext) {
     try {
-      console.log('🔍 DEBUG BACKEND - PortefeuilleController.show - DÉBUT');
-      
       // Si pas de userId dans params, utiliser l'utilisateur connecté
       const userId = params.userId || auth.user?.id
-      console.log('🔍 DEBUG BACKEND - userId:', userId);
-      console.log('🔍 DEBUG BACKEND - params.userId:', params.userId);
-      console.log('🔍 DEBUG BACKEND - auth.user?.id:', auth.user?.id);
 
       if (!userId) {
-        console.log('❌ DEBUG BACKEND - Utilisateur non identifié');
         return response.badRequest({
           success: false,
           message: 'Utilisateur non identifié',
         })
       }
 
-      console.log('🔍 DEBUG BACKEND - Recherche portefeuille pour userId:', userId);
       let portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', userId)
         .where('is_active', true)
         .first()
 
-      console.log('🔍 DEBUG BACKEND - Portefeuille trouvé:', !!portefeuille);
-      if (portefeuille) {
-        console.log('🔍 DEBUG BACKEND - Solde disponible actuel:', portefeuille.soldeDisponible);
-        console.log('🔍 DEBUG BACKEND - Solde en attente actuel:', portefeuille.soldeEnAttente);
-      }
-
       // Si pas de portefeuille, en créer un
       if (!portefeuille) {
-        console.log('🔍 DEBUG BACKEND - Création nouveau portefeuille');
         portefeuille = await PortefeuilleEcodeli.create({
           utilisateurId: userId,
           soldeDisponible: 0,
           soldeEnAttente: 0,
           isActive: true,
         })
-        console.log('🔍 DEBUG BACKEND - Nouveau portefeuille créé avec ID:', portefeuille.id);
       }
 
       const responseData = {
@@ -59,10 +44,7 @@ export default class PortefeuilleController {
         virementAutoActif: portefeuille.virementAutoActif,
         seuilVirementAuto: portefeuille.seuilVirementAuto,
         iban: portefeuille.iban ? `****${portefeuille.iban.slice(-4)}` : null,
-      };
-      
-      console.log('✅ DEBUG BACKEND - Données retournées:', responseData);
-      console.log('✅ DEBUG BACKEND - PortefeuilleController.show - FIN');
+      }
 
       return response.ok({
         success: true,
@@ -309,16 +291,10 @@ export default class PortefeuilleController {
    */
   public async confirmerRechargeCagnotte({ request, response, auth }: HttpContext) {
     try {
-      console.log('🔍 DEBUG BACKEND - confirmerRechargeCagnotte - DÉBUT');
-      
       const user = auth.user!
       const { payment_intent_id: paymentIntentId } = request.only(['payment_intent_id'])
-      
-      console.log('🔍 DEBUG BACKEND - user.id:', user.id);
-      console.log('🔍 DEBUG BACKEND - paymentIntentId:', paymentIntentId);
 
       if (!paymentIntentId) {
-        console.log('❌ DEBUG BACKEND - Payment Intent ID manquant');
         return response.badRequest({
           success: false,
           message: 'Payment Intent ID requis',
@@ -326,14 +302,10 @@ export default class PortefeuilleController {
       }
 
       // Vérifier le statut du paiement (pour recharge, on attend 'succeeded')
-      console.log('🔍 DEBUG BACKEND - Vérification statut paiement...');
+
       const paymentStatus = await StripeService.checkPaymentEscrowStatus(paymentIntentId)
-      console.log('🔍 DEBUG BACKEND - Statut paiement:', paymentStatus.status);
-      console.log('🔍 DEBUG BACKEND - Montant paiement:', paymentStatus.amount);
-      console.log('🔍 DEBUG BACKEND - Metadata paiement:', paymentStatus.metadata);
 
       if (paymentStatus.status !== 'succeeded') {
-        console.log('❌ DEBUG BACKEND - Paiement non confirmé, statut:', paymentStatus.status);
         return response.badRequest({
           success: false,
           message: `Le paiement n'a pas encore été confirmé. Statut actuel: ${paymentStatus.status}`,
@@ -346,43 +318,30 @@ export default class PortefeuilleController {
       }
 
       // Récupérer ou créer le portefeuille
-      console.log('🔍 DEBUG BACKEND - Recherche portefeuille pour user.id:', user.id);
+
       let portefeuille = await PortefeuilleEcodeli.query()
         .where('utilisateur_id', user.id)
         .where('is_active', true)
         .first()
 
-      console.log('🔍 DEBUG BACKEND - Portefeuille trouvé:', !!portefeuille);
-      if (portefeuille) {
-        console.log('🔍 DEBUG BACKEND - Solde disponible AVANT recharge:', portefeuille.soldeDisponible);
-      }
-
       if (!portefeuille) {
-        console.log('🔍 DEBUG BACKEND - Création nouveau portefeuille pour recharge');
         portefeuille = await PortefeuilleEcodeli.create({
           utilisateurId: user.id,
           soldeDisponible: 0,
           soldeEnAttente: 0,
           isActive: true,
         })
-        console.log('🔍 DEBUG BACKEND - Nouveau portefeuille créé avec ID:', portefeuille.id);
       }
 
       // Ajouter les fonds directement au solde disponible (pas d'escrow pour les recharges)
       const montantRecharge = Number(paymentStatus.amount)
       const ancienSolde = Number(portefeuille.soldeDisponible)
-      
-      console.log('🔍 DEBUG BACKEND - Montant à recharger:', montantRecharge);
-      console.log('🔍 DEBUG BACKEND - Ancien solde:', ancienSolde);
-      console.log('🔍 DEBUG BACKEND - Nouveau solde calculé:', ancienSolde + montantRecharge);
 
       portefeuille.soldeDisponible = ancienSolde + montantRecharge
       await portefeuille.save()
-      
-      console.log('🔍 DEBUG BACKEND - Portefeuille sauvegardé avec nouveau solde:', portefeuille.soldeDisponible);
 
       // Enregistrer la transaction
-      console.log('🔍 DEBUG BACKEND - Création transaction de recharge...');
+
       const transaction = await TransactionPortefeuille.create({
         portefeuilleId: portefeuille.id,
         utilisateurId: user.id,
@@ -398,10 +357,6 @@ export default class PortefeuilleController {
           stripe_payment_intent: paymentIntentId,
         }),
       })
-      
-      console.log('🔍 DEBUG BACKEND - Transaction créée avec ID:', transaction.id);
-      console.log('✅ DEBUG BACKEND - Recharge terminée avec succès');
-      console.log('✅ DEBUG BACKEND - confirmerRechargeCagnotte - FIN');
 
       return response.ok({
         success: true,

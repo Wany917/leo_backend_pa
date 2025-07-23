@@ -12,8 +12,6 @@ export default class CodeTemporairesController {
   async generate_code({ request, response }: HttpContext) {
     const { user_info: userInfo } = await request.validateUsing(generateCodeValidator)
 
-
-
     const userExists = await CodeTemporaire.query().where('user_info', userInfo).first()
 
     if (userExists) {
@@ -22,29 +20,23 @@ export default class CodeTemporairesController {
 
     const code = Math.floor(100000 + Math.random() * 900000).toString()
 
-
     try {
       await CodeTemporaire.create({ user_info: userInfo, code })
 
       return response.ok({ message: 'Code created successfully', code: code })
     } catch (error) {
-
       return response.badRequest({ error_message: 'Failed to create code', error })
     }
   }
-
 
   async check_code({ request, response }: HttpContext) {
     try {
       const { user_info: userInfo, code } = await request.validateUsing(checkCodeValidator)
 
-
       const { livraison_id: livraisonId, service_id: serviceId } = request.only([
         'livraison_id',
         'service_id',
       ])
-
-
 
       const codeTemporaire = await CodeTemporaire.query()
         .where('user_info', userInfo)
@@ -52,12 +44,9 @@ export default class CodeTemporairesController {
         .first()
 
       if (codeTemporaire) {
-        
         await CodeTemporaire.query().where('user_info', userInfo).where('code', code).delete()
 
-
         if (livraisonId) {
-
           const livraison = await Livraison.find(livraisonId)
           if (livraison && livraison.amount) {
             await this.libererFondsLivraison(livraisonId, livraison.amount)
@@ -71,15 +60,12 @@ export default class CodeTemporairesController {
           fundsReleased: !!(livraisonId || serviceId),
         })
       } else {
-
         return response.badRequest({ error_message: 'Invalid code' })
       }
     } catch (error) {
-
       return response.badRequest({ error_message: 'Failed to check code', error: error.message })
     }
   }
-
 
   async validateDelivery({ request, response }: HttpContext) {
     try {
@@ -88,7 +74,6 @@ export default class CodeTemporairesController {
         code,
         livraison_id: livraisonId,
       } = request.only(['user_info', 'code', 'livraison_id'])
-
 
       const codeTemporaire = await CodeTemporaire.query()
         .where('user_info', userInfo)
@@ -103,7 +88,6 @@ export default class CodeTemporairesController {
         })
       }
 
-
       const livraison = await Livraison.query()
         .where('id', livraisonId)
         .preload('livreur')
@@ -117,7 +101,6 @@ export default class CodeTemporairesController {
         })
       }
 
-
       if (!livraison.paymentIntentId) {
         return response.badRequest({
           success: false,
@@ -125,9 +108,7 @@ export default class CodeTemporairesController {
         })
       }
 
-
       if (livraison.paymentStatus === 'paid') {
-
         await CodeTemporaire.query().where('user_info', userInfo).where('code', code).delete()
 
         return response.ok({
@@ -149,17 +130,13 @@ export default class CodeTemporairesController {
         })
       }
 
-
-
       const StripeService = await import('#services/stripe_service')
       try {
         await StripeService.default.capturePaymentAfterDeliveryValidation(
           livraison.paymentIntentId,
           livraisonId
         )
-
       } catch (stripeError) {
-
         return response.internalServerError({
           success: false,
           message: 'Erreur lors de la capture du paiement Stripe',
@@ -175,7 +152,6 @@ export default class CodeTemporairesController {
         const paymentIntent = await stripe.paymentIntents.retrieve(livraison.paymentIntentId)
 
         if (paymentIntent.customer) {
-
           const invoice = await stripe.invoices.create({
             customer: paymentIntent.customer as string,
             description: `Livraison EcoDeli #${livraison.id}`,
@@ -188,7 +164,6 @@ export default class CodeTemporairesController {
             auto_advance: false, // Ne pas envoyer automatiquement
           })
 
-
           await stripe.invoiceItems.create({
             customer: paymentIntent.customer as string,
             invoice: invoice.id,
@@ -200,28 +175,18 @@ export default class CodeTemporairesController {
             },
           })
 
-
           if (invoice.id) {
             const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id)
 
             stripeInvoiceId = finalizedInvoice.id || null
-
-
-
           }
         }
-      } catch (invoiceError) {
-
-
-      }
-
+      } catch (invoiceError) {}
 
       await this.libererFondsLivraison(livraisonId, montantALiberer)
 
-
       livraison.paymentStatus = 'paid'
       await livraison.save()
-
 
       await CodeTemporaire.query().where('user_info', userInfo).where('code', code).delete()
 
@@ -235,8 +200,6 @@ export default class CodeTemporairesController {
         },
       })
     } catch (error) {
-
-
       if (error.message?.includes('Solde en attente insuffisant')) {
         return response.badRequest({
           success: false,
@@ -246,7 +209,6 @@ export default class CodeTemporairesController {
           details: 'Veuillez réessayer dans quelques minutes ou contacter le support.',
         })
       }
-
 
       return response.internalServerError({
         success: false,
@@ -259,8 +221,6 @@ export default class CodeTemporairesController {
   async reset_code({ request, response }: HttpContext) {
     try {
       const { user_info: userInfo } = await request.validateUsing(generateCodeValidator)
-
-
 
       const codeTemporaire = await CodeTemporaire.query().where('user_info', userInfo).first()
 
@@ -307,7 +267,6 @@ export default class CodeTemporairesController {
         })
       }
 
-
       const LivreurModel = await import('#models/livreur')
       const Livreur = LivreurModel.default
       const livreur = await Livreur.find(livraison.livreur.id)
@@ -322,8 +281,7 @@ export default class CodeTemporairesController {
             livreur.stripeAccountId
           )
           accountReady = accountStatus.payouts_enabled
-        } catch (error) {
-        }
+        } catch (error) {}
       }
 
       if (hasStripeConnect && accountReady && livreur.stripeAccountId) {
@@ -383,14 +341,11 @@ export default class CodeTemporairesController {
             next_step: 'manual_transfer_available',
           }),
         })
-
-
       }
     } catch (error) {
       throw error
     }
   }
-
 
   private async libererFondsService(serviceId: number) {
     try {
@@ -407,7 +362,6 @@ export default class CodeTemporairesController {
         .where('is_active', true)
         .first()
 
-
       if (!portefeuille) {
         portefeuille = await PortefeuilleEcodeli.create({
           utilisateurId: service.prestataire.id,
@@ -417,13 +371,10 @@ export default class CodeTemporairesController {
         })
       }
 
-
       const commission = service.price * 0.08
       const montantPrestataire = service.price - commission
 
-
       await portefeuille.libererFonds(montantPrestataire)
-
 
       await TransactionPortefeuille.create({
         portefeuilleId: portefeuille.id,

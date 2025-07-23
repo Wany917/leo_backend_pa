@@ -161,6 +161,7 @@ export default class AnnoncesController {
         end_location: endLocation,
         start_location: startLocation,
         priority,
+        tags,
       } = await request.validateUsing(annonceValidator)
 
       const annonce = await Annonce.create({
@@ -175,6 +176,7 @@ export default class AnnoncesController {
         endLocation: endLocation ?? null,
         startLocation: startLocation ?? null,
         priority: priority ?? false,
+        tags: tags ?? [],
       })
       const image = request.file('image')
       if (image) {

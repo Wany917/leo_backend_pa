@@ -12,5 +12,6 @@ export const annonceValidator = vine.compile(
     end_location: vine.string().optional(),
     start_location: vine.string().optional(),
     priority: vine.boolean().optional(),
+    tags: vine.array(vine.string()).optional(),
   })
 )
