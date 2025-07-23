@@ -133,6 +133,7 @@ router
     router
       .group(() => {
         router.get('/available', [ShopkeeperDeliveriesController, 'getAvailable'])
+        router.get('/my-deliveries/:livreurId', [ShopkeeperDeliveriesController, 'getMyDeliveries'])
         router.post('/:id/accept', [ShopkeeperDeliveriesController, 'accept'])
         router.put('/:id/status', [ShopkeeperDeliveriesController, 'updateStatus'])
       })
@@ -206,6 +207,7 @@ router
     router.put(':id', [AnnonceController, 'updateAnnonce'])
     router.put(':id/with-string-dates', [AnnonceController, 'updateAnnonceWithStringDates'])
     router.delete(':id', [AnnonceController, 'delete']).use(middleware.auth())
+    router.post(':id/cancel', [AnnonceController, 'cancel']).use(middleware.auth())
     router.post(':id/services', [AnnonceServicesController, 'attachServices'])
     router.delete(':id/services', [AnnonceServicesController, 'detachServices'])
     router.get(':id/services', [AnnonceServicesController, 'getServices'])

@@ -197,6 +197,31 @@ export default class ShopkeeperDeliveriesController {
   }
 
   /**
+   * Récupère les livraisons de commerçants acceptées par un livreur spécifique.
+   */
+  public async getMyDeliveries({ params, response }: HttpContext) {
+    const { livreurId } = params
+
+    const myDeliveries = await db
+      .from('shopkeeper_deliveries')
+      .where('livreur_id', livreurId)
+      .whereNot('status', 'pending_acceptance')
+      .join(
+        'utilisateurs as commercant_user',
+        'shopkeeper_deliveries.commercant_id',
+        'commercant_user.id'
+      )
+      .select(
+        'shopkeeper_deliveries.*',
+        'commercant_user.first_name as commercant_first_name',
+        'commercant_user.last_name as commercant_last_name'
+      )
+      .orderBy('shopkeeper_deliveries.created_at', 'desc')
+
+    return response.ok(myDeliveries)
+  }
+
+  /**
    * Récupère les livraisons disponibles pour les livreurs.
    */
   public async getAvailable({ response }: HttpContext) {

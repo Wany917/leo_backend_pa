@@ -6,6 +6,8 @@ import type { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 import { DateTime } from 'luxon'
 import app from '@adonisjs/core/services/app'
 import db from '@adonisjs/lucid/services/db'
+import PortefeuilleEcodeli from '#models/portefeuille_ecodeli'
+import TransactionPortefeuille from '#models/transaction_portefeuille'
 
 export default class AnnoncesController {
   async getAllAnnonces({ request, response }: HttpContext) {
@@ -144,8 +146,9 @@ export default class AnnoncesController {
     }
   }
 
-  async create({ request, response }: HttpContext) {
+  async create({ request, response, auth }: HttpContext) {
     try {
+      const user = auth.user!
       const result = await db.from('annonces').max('id as maxId').first()
       const maxId = result?.maxId || 0
       const nextId = Number(maxId) + 1
@@ -164,6 +167,30 @@ export default class AnnoncesController {
         tags,
       } = await request.validateUsing(annonceValidator)
 
+      // Vérifier et débiter le portefeuille de l'utilisateur
+      const portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', utilisateurId)
+        .where('is_active', true)
+        .first()
+
+      if (!portefeuille) {
+        return response.badRequest({
+          success: false,
+          message: 'Portefeuille non trouvé. Veuillez recharger votre compte.',
+        })
+      }
+
+      if (portefeuille.soldeDisponible < price) {
+        return response.badRequest({
+          success: false,
+          message: `Solde insuffisant. Disponible: ${portefeuille.soldeDisponible}€, Requis: ${price}€`,
+        })
+      }
+
+      // Débiter le portefeuille
+      const ancienSolde = portefeuille.soldeDisponible
+      await portefeuille.retirerFonds(price)
+
       const annonce = await Annonce.create({
         id: nextId,
         utilisateurId: utilisateurId,
@@ -177,6 +204,24 @@ export default class AnnoncesController {
         startLocation: startLocation ?? null,
         priority: priority ?? false,
         tags: tags ?? [],
+      })
+
+      // Enregistrer la transaction de débit
+      await TransactionPortefeuille.create({
+        portefeuilleId: portefeuille.id,
+        utilisateurId: utilisateurId,
+        typeTransaction: 'debit',
+        montant: price,
+        soldeAvant: ancienSolde,
+        soldeApres: portefeuille.soldeDisponible,
+        description: `Création d'annonce: ${title}`,
+        referenceExterne: annonce.id.toString(),
+        statut: 'completed',
+        metadata: JSON.stringify({
+          type: 'annonce_creation',
+          annonce_id: annonce.id,
+          annonce_type: type,
+        }),
       })
       const image = request.file('image')
       if (image) {
@@ -419,6 +464,37 @@ export default class AnnoncesController {
         })
       }
 
+      // Rembourser l'utilisateur avant de supprimer l'annonce
+      const portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', annonce.utilisateurId)
+        .where('is_active', true)
+        .first()
+
+      if (portefeuille) {
+        const ancienSolde = portefeuille.soldeDisponible
+        portefeuille.soldeDisponible = ancienSolde + annonce.price
+        await portefeuille.save()
+
+        // Enregistrer la transaction de remboursement
+        await TransactionPortefeuille.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: annonce.utilisateurId,
+          typeTransaction: 'credit',
+          montant: annonce.price,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: `Remboursement annonce supprimée: ${annonce.title}`,
+          referenceExterne: annonce.id.toString(),
+          statut: 'completed',
+          metadata: JSON.stringify({
+            type: 'annonce_refund',
+            annonce_id: annonce.id,
+            annonce_type: annonce.type,
+            reason: 'deletion',
+          }),
+        })
+      }
+
       await db.from('colis').where('annonce_id', annonceId).delete()
 
       await db.from('annonce_services').where('annonce_id', annonceId).delete()
@@ -426,13 +502,115 @@ export default class AnnoncesController {
         await annonce.delete()
 
       return response.ok({
-        message: 'Annonce supprimée avec succès',
+        message: 'Annonce supprimée avec succès et montant remboursé',
         deleted_annonce_id: annonceId,
+        refunded_amount: annonce.price,
       })
     } catch (error) {
 
       return response.status(500).send({
         error: "Erreur lors de la suppression de l'annonce",
+        details: error.message,
+      })
+    }
+  }
+
+  /**
+   * Annuler une annonce (change le statut à 'cancelled' et rembourse l'utilisateur)
+   */
+  async cancel({ request, response, auth }: HttpContext) {
+    try {
+      const annonceId = request.param('id')
+      const user = await auth.authenticate()
+
+      const annonce = await Annonce.query()
+        .where('id', annonceId)
+        .preload('utilisateur' as ExtractModelRelations<Annonce>)
+        .first()
+
+      if (!annonce) {
+        return response.status(404).send({
+          error: 'Annonce non trouvée',
+        })
+      }
+
+      if (annonce.utilisateurId !== user.id) {
+        return response.status(403).send({
+          error: "Vous n'êtes pas autorisé à annuler cette annonce",
+        })
+      }
+
+      if (annonce.status === 'cancelled') {
+        return response.status(400).send({
+          error: 'Cette annonce est déjà annulée',
+        })
+      }
+
+      if (annonce.status === 'completed') {
+        return response.status(400).send({
+          error: 'Impossible d\'annuler une annonce terminée',
+        })
+      }
+
+      // Vérifier s'il y a des livraisons en cours
+      const livraisons = await db
+        .from('livraisons')
+        .join('livraison_colis', 'livraisons.id', '=', 'livraison_colis.livraison_id')
+        .join('colis', 'livraison_colis.colis_id', '=', 'colis.id')
+        .where('colis.annonce_id', annonceId)
+        .whereIn('livraisons.status', ['scheduled', 'in_progress'])
+
+      if (livraisons.length > 0) {
+        return response.status(400).send({
+          error: 'Impossible d\'annuler cette annonce car elle a des livraisons en cours',
+          livraisons_actives: livraisons.length,
+        })
+      }
+
+      // Rembourser l'utilisateur
+      const portefeuille = await PortefeuilleEcodeli.query()
+        .where('utilisateur_id', annonce.utilisateurId)
+        .where('is_active', true)
+        .first()
+
+      if (portefeuille) {
+        const ancienSolde = portefeuille.soldeDisponible
+        portefeuille.soldeDisponible = ancienSolde + annonce.price
+        await portefeuille.save()
+
+        // Enregistrer la transaction de remboursement
+        await TransactionPortefeuille.create({
+          portefeuilleId: portefeuille.id,
+          utilisateurId: annonce.utilisateurId,
+          typeTransaction: 'credit',
+          montant: annonce.price,
+          soldeAvant: ancienSolde,
+          soldeApres: portefeuille.soldeDisponible,
+          description: `Remboursement annonce annulée: ${annonce.title}`,
+          referenceExterne: annonce.id.toString(),
+          statut: 'completed',
+          metadata: JSON.stringify({
+            type: 'annonce_refund',
+            annonce_id: annonce.id,
+            annonce_type: annonce.type,
+            reason: 'cancellation',
+          }),
+        })
+      }
+
+      // Changer le statut de l'annonce
+      annonce.status = 'cancelled'
+      await annonce.save()
+
+      return response.ok({
+        message: 'Annonce annulée avec succès et montant remboursé',
+        cancelled_annonce_id: annonceId,
+        refunded_amount: annonce.price,
+        new_status: 'cancelled',
+      })
+    } catch (error) {
+      return response.status(500).send({
+        error: "Erreur lors de l'annulation de l'annonce",
         details: error.message,
       })
     }
