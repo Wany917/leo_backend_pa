@@ -6,6 +6,7 @@ import Livreur from '#models/livreur'
 import Client from '#models/client'
 import Annonce from '#models/annonce'
 import HistoriqueLivraison from '#models/historique_livraison'
+import ShopkeeperDelivery from '#models/shopkeeper_delivery'
 import Ws from '#services/ws'
 
 export default class Livraison extends BaseModel {
@@ -20,6 +21,9 @@ export default class Livraison extends BaseModel {
 
   @column({ columnName: 'annonce_id' })
   declare annonceId: number | null
+
+  @column({ columnName: 'shopkeeper_delivery_id' })
+  declare shopkeeperDeliveryId: number | null
 
   @column()
   declare pickupLocation: string
@@ -62,6 +66,12 @@ export default class Livraison extends BaseModel {
     localKey: 'id',
   })
   declare annonce: BelongsTo<typeof Annonce>
+
+  @belongsTo(() => ShopkeeperDelivery, {
+    foreignKey: 'shopkeeperDeliveryId',
+    localKey: 'id',
+  })
+  declare shopkeeperDelivery: BelongsTo<typeof ShopkeeperDelivery>
 
   @manyToMany(() => Colis, {
     pivotTable: 'livraison_colis',

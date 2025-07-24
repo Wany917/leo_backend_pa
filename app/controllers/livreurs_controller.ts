@@ -82,6 +82,9 @@ export default class LivreursController {
           })
         })
         .preload('historique')
+        .preload('shopkeeperDelivery', (shopkeeperQuery) => {
+          shopkeeperQuery.preload('commercant')
+        })
 
       // Filtrer par statut si fourni
       if (status) {
@@ -179,7 +182,7 @@ export default class LivreursController {
         // Entrée pour la prise en charge
         await ColisLocationHistory.create({
           colisId: coli.id,
-          locationType: 'livreur_location',
+          locationType: 'in_transit',
           locationId: livreur.id,
           address: livreur.user?.address || 'Adresse du livreur non renseignée',
           description: `Livraison prise en charge par ${livreur.user?.last_name || 'le livreur'} ${livreur.user?.first_name || ''} (ID: ${livreurId})`,
@@ -189,7 +192,7 @@ export default class LivreursController {
         // Entrée pour le début de la livraison
         await ColisLocationHistory.create({
           colisId: coli.id,
-          locationType: 'pickup_location',
+          locationType: 'warehouse',
           locationId: null,
           address: livraison.pickupLocation,
           description: 'Début de la livraison - Le livreur se dirige vers le point de collecte',
@@ -262,7 +265,7 @@ export default class LivreursController {
         await ColisLocationHistory.create({
           colisId: coli.id,
           locationType: 'in_transit',
-          locationId: livreur.id,
+          locationId: livreurId,
           address: livraison.pickupLocation,
           description: remarks || 'Colis récupéré avec succès - En route vers la destination',
           movedAt: DateTime.now(),
@@ -518,7 +521,7 @@ export default class LivreursController {
         for (const coli of livraison.colis) {
           await ColisLocationHistory.create({
             colisId: coli.id,
-            locationType: 'cancelled',
+            locationType: 'storage_box',
             locationId: Number(livreurId),
             address: livraison.pickupLocation || livraison.dropoffLocation,
             description: `Livraison annulée: ${cancellationReason}`,

@@ -12,7 +12,7 @@ export default class StockageColi extends BaseModel {
   declare colisId: number
 
   @column({ columnName: 'wharehouse_id' })
-  declare warehouseId: number
+  declare wharehouse_id: number
 
   @column()
   declare storage_area: string
@@ -29,7 +29,7 @@ export default class StockageColi extends BaseModel {
   declare colis: BelongsTo<typeof Colis>
 
   @belongsTo(() => Wharehouse, {
-    foreignKey: 'warehouseId',
+    foreignKey: 'wharehouse_id',
   })
   declare wharehouse: BelongsTo<typeof Wharehouse>
 

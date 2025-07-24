@@ -84,6 +84,7 @@ export default class ShopkeeperDeliveriesController {
       dropoffLocation: deliveryRequest.customerAddress,
       status: 'scheduled',
       price: deliveryRequest.price,
+      shopkeeperDeliveryId: deliveryRequest.id,
     })
 
     const validationCode = Math.floor(100000 + Math.random() * 900000).toString()
