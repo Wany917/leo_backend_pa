@@ -34,7 +34,6 @@ export default class AuthController {
         token: token.value!.release(),
       })
     } catch (error) {
-
       return response.status(401).send({ error_message: 'Unauthorized access', error: error })
     }
   }
@@ -91,7 +90,6 @@ export default class AuthController {
 
       return response.created({ user: user, token: token.value!.release() })
     } catch (error) {
-
       let errorMessage = 'Registration failed'
 
       if (error instanceof Error) {
@@ -102,7 +100,6 @@ export default class AuthController {
         errorMessage = error.message
       }
 
-
       response.status(400).send({ error_message: errorMessage })
     }
   }
@@ -110,7 +107,6 @@ export default class AuthController {
   async me({ auth, response }: HttpContext) {
     try {
       const user = await auth.authenticate()
-
 
       const fullUser = await Utilisateurs.query()
         .where('id', user.id)
@@ -121,7 +117,6 @@ export default class AuthController {
         .preload('commercant' as any)
         .firstOrFail()
 
-
       if (fullUser.state === 'closed' || fullUser.state === 'banned') {
         return response.status(403).send({
           error_message: 'Account unavailable. Please contact support.',
@@ -129,7 +124,6 @@ export default class AuthController {
           redirect_to_home: true,
         })
       }
-
 
       const userData = fullUser.serialize()
 

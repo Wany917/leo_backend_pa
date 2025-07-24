@@ -94,6 +94,7 @@ router
     router.get(':id', [UtilisateursController, 'get']).use(middleware.auth())
     router.put(':id', [UtilisateursController, 'update']).use(middleware.auth())
     router.post('check-password', [UtilisateursController, 'checkPassword']).use(middleware.auth())
+    router.post('reset-password', [UtilisateursController, 'resetPassword'])
   })
   .prefix('utilisateurs')
 

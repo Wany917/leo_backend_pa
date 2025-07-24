@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { userUpdateValidator } from '#validators/user_put'
 import { checkPasswordValidator } from '#validators/check_password'
 import Utilisateurs from '#models/utilisateurs'
+import Hash from '@adonisjs/core/services/hash'
 
 export default class UtilisateursController {
   async getRecent({ response }: HttpContext) {
@@ -80,6 +81,29 @@ export default class UtilisateursController {
         return response.unauthorized({ message: 'Unauthorized access', error_message: error })
       }
       return response.badRequest({ message: 'Wrong Parametters', error_code: error })
+    }
+  }
+
+  async resetPassword({ request, response }: HttpContext) {
+    try {
+      const { email, newPassword } = request.only(['email', 'newPassword'])
+      
+      if (!email || !newPassword) {
+        return response.badRequest({ message: 'Email and new password are required' })
+      }
+
+      const user = await Utilisateurs.findBy('email', email)
+      if (!user) {
+        return response.notFound({ message: 'User not found' })
+      }
+
+      const hashedPassword = await Hash.make(newPassword)
+      user.password = hashedPassword
+      await user.save()
+
+      return response.ok({ message: 'Password reset successfully' })
+    } catch (error) {
+      return response.internalServerError({ message: 'Failed to reset password', error_code: error })
     }
   }
 }
